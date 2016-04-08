@@ -1,5 +1,9 @@
-const Tilda = require('./tilda.js');
+const {Tilda, CanvasRenderer} = require('./tilda.js');
 
 window.addEventListener('load', () => {
-	var game = new Tilda(document.querySelector('canvas'));
+    var canvasRenderer = new CanvasRenderer(document.querySelector('canvas'));
+	var game = new Tilda(canvasRenderer);
+	game.loadLevel('levels/overworld.json').then((level) => {
+	   game.start(); 
+	});
 });
