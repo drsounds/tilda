@@ -8,12 +8,24 @@ var CanvasRenderer = _require.CanvasRenderer;
 
 
 window.addEventListener('load', function () {
-				var canvasRenderer = new CanvasRenderer(document.querySelector('canvas'));
-				var game = new Tilda(canvasRenderer);
-				game.loadLevel('levels/overworld.json').then(function (level) {
-								game.start();
-								//window.open('tileset.html');
-				});
+	var canvasRenderer = new CanvasRenderer(document.querySelector('canvas'));
+	var game = new Tilda(canvasRenderer);
+
+	var path = window.location.pathname.substr(1).split(/\//g);
+	var level = 'overworld';
+	console.log(path);
+	if (path.length > 1) {
+		level = path[1];
+	}
+
+	game.loadLevel(level).then(function (level) {
+		game.start();
+	});
+	game.addEventListener('levelchanged', function (event) {
+		history.pushState({
+			level: event.data.level.id
+		}, 'Level', '/level/' + event.data.level.id);
+	});
 });
 
 },{"./tilda.js":2}],2:[function(require,module,exports){
@@ -45,6 +57,8 @@ var GAME_RUNNING = 1;
 var TOOL_POINTER = 0;
 var TOOL_DRAW = 1;
 var TOOL_PROPERTIES = 2;
+var MODE_PLAYING = 0;
+var MODE_EDITING = 1;
 var TILESET = '';
 
 var Renderer = function () {
@@ -112,6 +126,20 @@ var CanvasRenderer = exports.CanvasRenderer = function (_Renderer) {
 }(Renderer);
 
 var Tilda = exports.Tilda = function () {
+	_createClass(Tilda, [{
+		key: 'dispatchEvent',
+		value: function dispatchEvent(event) {
+			if (this.hasOwnProperty('on' + event.type) && this['on' + event.type] instanceof Function) {
+				this['on' + event.type].call(this, event);
+			}
+		}
+	}, {
+		key: 'addEventListener',
+		value: function addEventListener(eventId, callback) {
+			this['on' + eventId] = callback;
+		}
+	}]);
+
 	function Tilda(renderer) {
 		var _this2 = this;
 
@@ -125,17 +153,18 @@ var Tilda = exports.Tilda = function () {
 		this.level = null;
 		this.blockTypes = {};
 		this.editor = {
-			activeTile: -1
+			activeBlockType: 2
 		};
 		this.cameraX = 0;
 		this.activeTile = {
-			x: 0, y: 0
+			x: 1, y: 2
 		};
 		this.cameraY = 0;
 		this.selectedX = 0;
 		this.activeTool = 0;
 		this.isJumpingOver = false;
 		this.selectedY = 0;
+		this.mode = MODE_EDITING;
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
@@ -146,40 +175,18 @@ var Tilda = exports.Tilda = function () {
 				if (xmlHttp.status == 200) {
 					var lines = xmlHttp.responseText.split('\n');
 					for (var i in lines) {
-						_this2.blockTypes[i] = new Block(lines[i]);
+						var block = new Block(lines[i]);
+						_this2.blockTypes[block.id] = block;
 					}
-					window.addEventListener('mousedown', function (event) {
-						var x = event.pageX;
-						var y = event.pageY;
-						var TILE_SIZE = 16;
-						var tileX = Math.floor((x + 1) / TILE_SIZE);
-						var tileY = Math.floor((y + 1) / TILE_SIZE);
-						var selection = document.querySelector('#selection');
-						selection.style.width = TILE_SIZE + 'px';
-						selection.style.height = TILE_SIZE + 'px';
-						selection.style.left = tileX * TILE_SIZE + 'px';
-						selection.style.top = tileY * TILE_SIZE + 'px';
-						var flags = 0;
-						for (var t in _this2.blockTypes) {
-							var tile = _this2.blockTypes[t];
-							if (tile.tileX == tileX && tile.tileY == tileY) {
-								flags = tile.flags;
-							}
-						}
-						window.opener.postMessage({
-							tile: {
-								x: tileX,
-								y: tileY,
-								flags: flags
-							}
-						}, '*');
-					});
 				} else {}
 			}
 		};
 		xmlHttp.open('GET', '/t.tileset', true);
 		xmlHttp.send(null);
-		window.addEventListener('click', function (event) {
+		window.addEventListener('mousedown', function (event) {
+			if (_this2.mode != MODE_EDITING) {
+				return;
+			}
 			var width = _this2.renderer.canvas.width;
 			var height = _this2.renderer.canvas.height;
 			var pageWidth = _this2.renderer.canvas.getBoundingClientRect().width;
@@ -193,15 +200,17 @@ var Tilda = exports.Tilda = function () {
 
 			_this2.selectedX = Math.floor((x + 1) / TILE_SIZE);
 			_this2.selectedY = Math.floor((y + 1) / TILE_SIZE);
-			if (_this2.activeTile.x > 0 && _this2.activeTile.y > 0) {
-				_this2.level.setBlock(x, y, new Block(_this2.activeTile.x + ' ' + _this2.activeTile.y + ' ' + _this2.activeTile.flags));
-			}
+			if (_this2.editor.activeBlockType == null) return;
+			_this2.level.setBlock(_this2.selectedX, _this2.selectedY, _this2.editor.activeBlockType);
+
+			_this2.level.save();
 		});
 		window.addEventListener('message', function (event) {
 			if (event.data.tile) {
 				var tileX = event.data.tile.x;
 				var tileY = event.data.tile.y;
 				_this2.activeTile.x = tileX;
+				_this2.activeTile.flags = event.data.tile.flags;
 				_this2.activeTile.y = tileY;
 				if (tileX == 0 && tileY == 0) {
 					_this2.activeTool = TOOL_POINTER;
@@ -213,6 +222,16 @@ var Tilda = exports.Tilda = function () {
 	}
 
 	_createClass(Tilda, [{
+		key: 'getBlockType',
+		value: function getBlockType(blockType) {
+			for (var b in this.blockTypes) {
+				var bt = this.blockTypes[b];
+				if (bt.tileX == blockType.tileX && bt.tileY == blockType.tileY && bt.flags == blockType.flags) {
+					return b;
+				}
+			}
+		}
+	}, {
 		key: 'start',
 		value: function start() {
 			this.gameInterval = setInterval(this.tick.bind(this), 5);
@@ -239,7 +258,7 @@ var Tilda = exports.Tilda = function () {
 		}
 	}, {
 		key: 'loadLevel',
-		value: function loadLevel(url) {
+		value: function loadLevel(id) {
 			var _this3 = this;
 
 			return new Promise(function (resolve, reject) {
@@ -249,6 +268,8 @@ var Tilda = exports.Tilda = function () {
 						if (xmlHttp.status == 200) {
 							var level = JSON.parse(xmlHttp.responseText);
 							level = new Level(_this3, level);
+							level.id = id;
+
 							_this3.setLevel(level);
 							resolve(level);
 						} else {
@@ -256,7 +277,7 @@ var Tilda = exports.Tilda = function () {
 						}
 					}
 				};
-				xmlHttp.open('GET', url, true);
+				xmlHttp.open('GET', '/api/levels/' + id, true);
 				xmlHttp.send(null);
 			});
 		}
@@ -264,6 +285,12 @@ var Tilda = exports.Tilda = function () {
 		key: 'setLevel',
 		value: function setLevel(level) {
 			this.level = level;
+			var evt = new CustomEvent('levelchanged');
+			evt.data = {
+				level: level
+			};
+
+			this.dispatchEvent(evt);
 		}
 	}, {
 		key: 'tick',
@@ -278,7 +305,10 @@ var Tilda = exports.Tilda = function () {
 						var left = x * TILE_SIZE;
 						var top = y * TILE_SIZE;
 						var block = this.level.blocks[x][y];
-						var blockType = this.blockTypes[block.type];
+						if (!block) {
+							return;
+						}
+						var blockType = this.blockTypes[block];
 						if (!blockType) {
 							continue;
 						}
@@ -344,7 +374,10 @@ var Tilda = exports.Tilda = function () {
 						var width = TILE_SIZE * this.zoom.x;
 						var height = TILE_SIZE * this.zoom.y;
 						var block = this.level.blocks[x][y];
-						var type = this.blockTypes[block.type];
+						if (!block) {
+							return;
+						}
+						var type = this.blockTypes[block];
 						if (!type) {
 							continue;
 						}
@@ -502,10 +535,11 @@ var Block = function Block(tile) {
 	_classCallCheck(this, Block);
 
 	var parts = tile.split(' ');
-	this.tileX = parseInt(parts[0]);
-	this.tileY = parseInt(parts[1]);
+	this.id = parts[0];
+	this.tileX = parseInt(parts[1]);
+	this.tileY = parseInt(parts[2]);
 
-	this.flags = parseInt(parts[2]);
+	this.flags = parseInt(parts[3]);
 };
 
 var Level = function () {
@@ -515,7 +549,50 @@ var Level = function () {
 			if (!(x in this.blocks)) {
 				this.blocks[x] = {};
 			}
+			if (!block) {
+				return;
+			}
 			this.blocks[x][y] = block;
+		}
+	}, {
+		key: 'save',
+		value: function save() {
+			var jsonData = {
+				blocks: [],
+				player: {
+					x: this.player.x,
+					y: this.player.y
+				}
+			};
+
+			for (var x in this.blocks) {
+				for (var y in this.blocks[x]) {
+					var block = this.blocks[x][y];
+					if (!block) {
+						return;
+					}
+					jsonData.blocks.push({
+						x: x,
+						y: y,
+						type: block
+					});
+				}
+			}
+
+			var json_upload = JSON.stringify(jsonData, null, 2);
+			var xmlHttp = new XMLHttpRequest(); // new HttpRequest instance
+			xmlHttp.onreadystatechange = function () {
+				if (xmlHttp.readyState == 4) {
+					if (xmlHttp.status == 200) {
+						var json = JSON.parse(xmlHttp.responseText);
+					} else {
+						debugger;
+					}
+				}
+			};
+			xmlHttp.open("PUT", "/api/levels/" + this.id + '', true);
+			xmlHttp.setRequestHeader("Content-Type", "application/json");
+			xmlHttp.send(json_upload);
 		}
 	}]);
 
@@ -523,16 +600,16 @@ var Level = function () {
 		_classCallCheck(this, Level);
 
 		this.game = game;
-
+		this.name = level.name;
 		this.blocks = {};
 		this.flags = level.flags;
 		this.objects = [];
 		for (var i in level.blocks) {
 			var block = level.blocks[i];
-			var blockType = this.game.blockTypes[block.type];
-			this.setBlock(block.x, block.y, block);
+			this.setBlock(block.x, block.y, block.type);
 		}
-		this.objects.push(new PlayerEntity(game, level));
+		this.player = new PlayerEntity(game, level);
+		this.objects.push(this.player);
 	}
 
 	_createClass(Level, [{

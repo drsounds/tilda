@@ -12,6 +12,8 @@ const GAME_RUNNING = 1;
 const TOOL_POINTER = 0;
 const TOOL_DRAW = 1;
 const TOOL_PROPERTIES = 2;
+const MODE_PLAYING = 0;
+const MODE_EDITING = 1;
 var TILESET = ``;
 
 
@@ -64,7 +66,18 @@ export class CanvasRenderer extends Renderer {
 }
 
 export class Tilda {
+	dispatchEvent(event) {
+		if (this.hasOwnProperty('on' + event.type) && this['on' + event.type] instanceof Function) {
+			this['on' + event.type].call(this, event);
+		}
+	}
+	addEventListener(eventId, callback) {
+		this['on' + eventId] = callback;
+	}
 	constructor (renderer) {
+		
+		
+		
 		this.renderer = renderer;
 		this.zoom = {
 			x: 1,
@@ -73,17 +86,18 @@ export class Tilda {
 		this.level = null;
 		this.blockTypes = {};
 		this.editor = {
-			activeTile: -1
+			activeBlockType: 2
 		};
 		this.cameraX = 0;
 		this.activeTile = {
-			x: 0, y: 0
+			x: 1, y: 2
 		};
 		this.cameraY = 0;
 		this.selectedX = 0;
 		this.activeTool = 0;
 		this.isJumpingOver = false;
 		this.selectedY = 0;
+		this.mode = MODE_EDITING;
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
@@ -94,43 +108,22 @@ export class Tilda {
 		    if (xmlHttp.status == 200) {
 		        var lines = xmlHttp.responseText.split('\n');
 		        for (var i in lines) {
-		            this.blockTypes[i] = (new Block(lines[i]));
+		        	var block = new Block(lines[i]);
+		            this.blockTypes[block.id] = block;
 		
 		        	
 		        }
-		        window.addEventListener('mousedown', (event) => {
-		            var x = event.pageX;
-		            var y = event.pageY;
-		            var TILE_SIZE = 16;
-		            var tileX = Math.floor((x + 1) / TILE_SIZE);
-		            var tileY = Math.floor((y + 1) / TILE_SIZE);
-		            var selection = document.querySelector('#selection');
-		            selection.style.width = TILE_SIZE + 'px';
-		            selection.style.height = TILE_SIZE + 'px';
-		            selection.style.left = (tileX * TILE_SIZE) + 'px';
-		            selection.style.top = (tileY * TILE_SIZE) + 'px';
-		            var flags = 0;
-		            for(var t in this.blockTypes) {
-		                var tile = this.blockTypes[t];
-		                if (tile.tileX == tileX && tile.tileY == tileY) {
-		                    flags = tile.flags;
-		                }
-		            }
-		            window.opener.postMessage({
-		                tile: {
-		                    x: tileX,
-		                    y: tileY,
-		                    flags: flags
-		                }
-		            }, '*');
-		        });
+		        
 		    } else {
 		    }
 		}
 		};
 		xmlHttp.open('GET', '/t.tileset', true);
 		xmlHttp.send(null);
-		window.addEventListener('click', (event) => {
+		window.addEventListener('mousedown', (event) => {
+			if (this.mode != MODE_EDITING) {
+				return;
+			}
 			var width = this.renderer.canvas.width;
 			var height = this.renderer.canvas.height;
 			var pageWidth = this.renderer.canvas.getBoundingClientRect().width;
@@ -144,18 +137,18 @@ export class Tilda {
 			
 			this.selectedX = Math.floor((x + 1) / TILE_SIZE);
 			this.selectedY = Math.floor((y + 1) / TILE_SIZE) ;
-			if (this.activeTile.x > 0 && this.activeTile.y > 0) {
-				this.level.setBlock(x, y, new Block(
-					this.activeTile.x + ' ' + this.activeTile.y + ' ' + this.activeTile.flags	
-				));
-				
-			}
+			if (this.editor.activeBlockType == null)
+				return;
+			this.level.setBlock(this.selectedX, this.selectedY, this.editor.activeBlockType);
+					
+			this.level.save();
 		});
 		window.addEventListener('message', (event) => {
 			if (event.data.tile) {
 				var tileX = event.data.tile.x;
 				var tileY = event.data.tile.y;
 				this.activeTile.x = tileX;
+				this.activeTile.flags = event.data.tile.flags;
 				this.activeTile.y = tileY;
 				if (tileX == 0 && tileY == 0) {
 					this.activeTool = TOOL_POINTER;
@@ -165,7 +158,16 @@ export class Tilda {
 			}
 		})
 	}
-
+	
+	getBlockType(blockType) {
+		for (var b in this.blockTypes) {
+			var bt = this.blockTypes[b];
+			if (bt.tileX == blockType.tileX && bt.tileY == blockType.tileY && bt.flags == blockType.flags) {
+				return b;
+			}
+		}
+	}
+	
 	start() {
 		this.gameInterval = setInterval(this.tick.bind(this), 5);
 		this.renderInterval = setInterval(this.render.bind(this), 5);
@@ -188,7 +190,7 @@ export class Tilda {
 		}
 	}
 
-	loadLevel(url) {
+	loadLevel(id) {
 		return new Promise((resolve, reject) => {
 			var xmlHttp = new XMLHttpRequest();
 			xmlHttp.onreadystatechange = () => {
@@ -196,6 +198,8 @@ export class Tilda {
 					if (xmlHttp.status == 200) {
 						var level = JSON.parse(xmlHttp.responseText);
 						level = new Level(this, level);
+						level.id = id;
+						
 						this.setLevel(level);
 						resolve(level);
 					} else {
@@ -203,13 +207,19 @@ export class Tilda {
 					}
 				}
 			}
-			xmlHttp.open('GET', url, true);
+			xmlHttp.open('GET', '/api/levels/' + id, true);
 			xmlHttp.send(null);
 		});
 	}
 
 	setLevel(level) {
 		this.level = level;
+		var evt = new CustomEvent('levelchanged');
+		evt.data = {
+			level: level
+		};
+		
+		this.dispatchEvent(evt);
 	}
 
 	tick() {
@@ -223,7 +233,10 @@ export class Tilda {
 					var left = x * TILE_SIZE;
 					var top = y * TILE_SIZE;
 					var block = this.level.blocks[x][y];
-					var blockType = this.blockTypes[block.type];
+					if (!block) {
+						return;
+					}
+					var blockType = this.blockTypes[block];
 					if (!blockType) {
 						continue;
 					}
@@ -292,7 +305,10 @@ export class Tilda {
 					var width = TILE_SIZE * this.zoom.x;
 					var height = TILE_SIZE * this.zoom.y;
 					var block = this.level.blocks[x][y];
-					var type = this.blockTypes[block.type];
+					if (!block) {
+						return;
+					}
+					var type = this.blockTypes[block];
 					if (!type) {
 						continue;
 					}
@@ -432,10 +448,11 @@ class PlayerEntity extends Entity {
 class Block {
 	constructor(tile) {
 		var parts = tile.split(' ');
-		this.tileX = parseInt(parts[0]);
-		this.tileY = parseInt(parts[1]);
+		this.id = parts[0];
+		this.tileX = parseInt(parts[1]);
+		this.tileY = parseInt(parts[2]);
 	
-		this.flags = parseInt(parts[2]);
+		this.flags = parseInt(parts[3]);
 	}
 }
 
@@ -444,20 +461,63 @@ class Level {
 		if (!(x in this.blocks)) {
 			this.blocks[x] = {};
 		}
+		if (!block) {
+			return;
+		}
 		this.blocks[x][y] = block;
+	}
+	
+	save() {
+		var jsonData = {
+			blocks:[],
+			player: {
+				x: this.player.x,
+				y: this.player.y
+			}
+		};
+		
+		for (var x in this.blocks) {
+			for (var y in this.blocks[x]) {
+				var block = this.blocks[x][y];
+				if (!block) {
+					return;
+				}
+				jsonData.blocks.push({
+					x: x,
+					y: y,
+					type: block
+				});
+			}
+		}
+		
+		var json_upload = JSON.stringify(jsonData, null, 2);
+		var xmlHttp = new XMLHttpRequest();   // new HttpRequest instance 
+		xmlHttp.onreadystatechange = function () {
+			if (xmlHttp.readyState == 4) {
+				if (xmlHttp.status == 200) {
+					var json = JSON.parse(xmlHttp.responseText);
+					
+				} else {
+					debugger;
+				}
+			}
+		}
+		xmlHttp.open("PUT", "/api/levels/" + this.id + '', true);
+		xmlHttp.setRequestHeader("Content-Type", "application/json");
+		xmlHttp.send(json_upload);
 	}
 	constructor(game, level) {
 		this.game = game;
-
+		this.name = level.name;
 		this.blocks = {};
 		this.flags = level.flags;
 		this.objects = [];
 		for (var i in level.blocks) {
 			var block = level.blocks[i];
-			var blockType = this.game.blockTypes[block.type];
-			this.setBlock(block.x, block.y, block);
+			this.setBlock(block.x, block.y, block.type);
 		}
-		this.objects.push(new PlayerEntity(game, level));
+		this.player = new PlayerEntity(game, level);
+		this.objects.push(this.player);
 	}
 
 	render() {

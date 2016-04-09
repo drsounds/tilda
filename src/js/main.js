@@ -3,8 +3,24 @@ const {Tilda, CanvasRenderer} = require('./tilda.js');
 window.addEventListener('load', () => {
     var canvasRenderer = new CanvasRenderer(document.querySelector('canvas'));
 	var game = new Tilda(canvasRenderer);
-	game.loadLevel('levels/overworld.json').then((level) => {
+	
+	var path = window.location.pathname.substr(1).split(/\//g);
+	var level = 'overworld';
+	console.log(path);
+	if (path.length > 1) {
+		level = path[1];
+	}
+	
+	game.loadLevel(level).then((level) => {
 	   game.start(); 
-	   //window.open('tileset.html');
+	});
+	game.addEventListener('levelchanged', function (event) {
+		history.pushState(
+			{
+				level: event.data.level.id
+			},
+			'Level',
+			'/level/' + event.data.level.id
+		);
 	});
 });
