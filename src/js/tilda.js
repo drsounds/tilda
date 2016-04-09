@@ -121,10 +121,8 @@ export class Tilda {
 			x: 1, y: 2
 		};
 		this.cameraY = 0;
-		this.selectedX = 0;
 		this.activeTool = 0;
 		this.isJumpingOver = false;
-		this.selectedY = 0;
 		this.mode = MODE_EDITING;
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
@@ -289,7 +287,7 @@ export class Tilda {
 					}
 					var is_solid = (blockType.flags & TILE_SOLID) == TILE_SOLID;
 					var obj = this.level.objects[i];
-					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && block.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.moveX > 0 && is_solid) {
+					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE * 0.8 && obj.y < top + TILE_SIZE / 2 - 1 && obj.moveX > 0 && is_solid) {
 						if ((blockType.flags & TILE_FLAG_JUMP_LEFT) == TILE_FLAG_JUMP_LEFT) {
 							this.isJumpingOver = true;
 							obj.moveX = -4;
@@ -299,7 +297,7 @@ export class Tilda {
 						}
 					}
 					
-					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.x < left + TILE_SIZE && obj.x > left && obj.moveX < 0 && is_solid) {
+					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 1 && obj.x < left + TILE_SIZE * 0.9 && obj.x > left - TILE_SIZE * 0.8 && obj.moveX < 0 && is_solid) {
 					
 						if ((blockType.flags & TILE_FLAG_JUMP_RIGHT)  == TILE_FLAG_JUMP_RIGHT) {
 							this.isJumpingOver = true;
@@ -310,7 +308,7 @@ export class Tilda {
 						
 					}
 
-					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE / 2 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.moveY > 0 && is_solid) {
+					if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.moveY > 0 && is_solid) {
 						
 						if ((blockType.flags & TILE_FLAG_JUMP_BOTTOM)  == TILE_FLAG_JUMP_BOTTOM) {
 							this.isJumpingOver = true;
@@ -321,7 +319,7 @@ export class Tilda {
 						}
 					}
 
-					if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE && obj.y < top + TILE_SIZE && obj.y > top - TILE_SIZE && obj.moveY < 0 && is_solid) {
+					if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
 						if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
 							this.isJumpingOver = true;
 							obj.moveY = -0.6;
@@ -394,7 +392,9 @@ export class Tilda {
 		var height = TILE_SIZE * this.zoom.y;
 		this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - TILE_SIZE * 2, TILE_SIZE, TILE_SIZE, this.activeTile.x * TILE_SIZE, this.activeTile.x * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 		
-		this.renderer.context.strokeStyle = 'yellow';
+		this.renderer.context.beginPath();
+		this.renderer.context.strokeStyle = 'blue';
+		this.renderer.context.strokeWidth = '1px';
 		this.renderer.context.rect(this.editor.selectedX * TILE_SIZE, this.editor.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 		this.renderer.context.stroke();
 	}
@@ -438,7 +438,7 @@ class Entity {
 }
 
 
-class PlayerEntity extends Entity {
+class CharacterEntity extends Entity {
 	constructor(game, level) {
 		super(game, level);
 		this.level = level;
@@ -446,24 +446,81 @@ class PlayerEntity extends Entity {
 		this.tileX = 2;
 		this.tileY = 1;
 		this.y = this.level.player.y;
+	
+	}
+	
+	turnRight() {
+		
+		this.tileX = 4;
+	}
+	turnLeft() {
+		
+		this.tileX = 5;
+	}
+	turnUp() {
+		
+		this.tileX = 2;
+	}
+	turnDown() {
+		
+		this.tileX = 3;
+	}
+	walkLeft() {
+		this.turnLeft();
+		this.moveX = -.3;
+	}
+	
+	walkRight() {
+		this.turnRight();
+		this.moveX = .3;
+		
+	}
+	
+	walkUp() {
+		this.moveY = -.3;
+		this.turnUp();
+	}
+	
+	walkDown() {
+		this.moveY = .3;
+		this.turnDown();
+	}
+	
+	jump() {
+		this.moveZ = 1;
+	}
+	
+	render() {
+
+	}
+}
+
+
+class PlayerEntity extends CharacterEntity {
+	
+	
+	constructor(game, level) {
+		super(game, level);
+		
 		window.onkeydown = (event) => {
 			if (this.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				this.moveY = -.3;
+				this.walkUp();
+			
 			}
 			if (event.code == 'ArrowDown') {
-				this.moveY = .3;
+				this.walkDown();
 			}
 			if (event.code == 'ArrowLeft') {
-				this.moveX = -.3;
+				this.walkLeft();
 			}
 			if (event.code == 'ArrowRight') {
-				this.moveX = .3;
+				this.walkRight();
 			}
 			if (event.code == 'KeyA') {
-				this.moveZ = 1;
+				this.jump();
 			}
 		}
 		window.onkeyup = (event) => {
@@ -486,10 +543,9 @@ class PlayerEntity extends Entity {
 				this.moveZ = 0;
 			}
 		}
+		
 	}
-	render() {
-
-	}
+	
 }
 
 

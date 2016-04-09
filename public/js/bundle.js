@@ -195,10 +195,8 @@ var Tilda = exports.Tilda = function () {
 			x: 1, y: 2
 		};
 		this.cameraY = 0;
-		this.selectedX = 0;
 		this.activeTool = 0;
 		this.isJumpingOver = false;
-		this.selectedY = 0;
 		this.mode = MODE_EDITING;
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
@@ -363,7 +361,7 @@ var Tilda = exports.Tilda = function () {
 						}
 						var is_solid = (blockType.flags & TILE_SOLID) == TILE_SOLID;
 						var obj = this.level.objects[i];
-						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && block.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.moveX > 0 && is_solid) {
+						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE * 0.8 && obj.y < top + TILE_SIZE / 2 - 1 && obj.moveX > 0 && is_solid) {
 							if ((blockType.flags & TILE_FLAG_JUMP_LEFT) == TILE_FLAG_JUMP_LEFT) {
 								this.isJumpingOver = true;
 								obj.moveX = -4;
@@ -373,7 +371,7 @@ var Tilda = exports.Tilda = function () {
 							}
 						}
 
-						if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.x < left + TILE_SIZE && obj.x > left && obj.moveX < 0 && is_solid) {
+						if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 1 && obj.x < left + TILE_SIZE * 0.9 && obj.x > left - TILE_SIZE * 0.8 && obj.moveX < 0 && is_solid) {
 
 							if ((blockType.flags & TILE_FLAG_JUMP_RIGHT) == TILE_FLAG_JUMP_RIGHT) {
 								this.isJumpingOver = true;
@@ -383,7 +381,7 @@ var Tilda = exports.Tilda = function () {
 							obj.moveX = 0;
 						}
 
-						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE / 2 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.moveY > 0 && is_solid) {
+						if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.moveY > 0 && is_solid) {
 
 							if ((blockType.flags & TILE_FLAG_JUMP_BOTTOM) == TILE_FLAG_JUMP_BOTTOM) {
 								this.isJumpingOver = true;
@@ -394,7 +392,7 @@ var Tilda = exports.Tilda = function () {
 							}
 						}
 
-						if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE && obj.y < top + TILE_SIZE && obj.y > top - TILE_SIZE && obj.moveY < 0 && is_solid) {
+						if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
 							if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
 								this.isJumpingOver = true;
 								obj.moveY = -0.6;
@@ -464,7 +462,9 @@ var Tilda = exports.Tilda = function () {
 			var height = TILE_SIZE * this.zoom.y;
 			this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - TILE_SIZE * 2, TILE_SIZE, TILE_SIZE, this.activeTile.x * TILE_SIZE, this.activeTile.x * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
-			this.renderer.context.strokeStyle = 'yellow';
+			this.renderer.context.beginPath();
+			this.renderer.context.strokeStyle = 'blue';
+			this.renderer.context.strokeWidth = '1px';
 			this.renderer.context.rect(this.editor.selectedX * TILE_SIZE, this.editor.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 			this.renderer.context.stroke();
 		}
@@ -517,69 +517,138 @@ var Entity = function () {
 	return Entity;
 }();
 
-var PlayerEntity = function (_Entity) {
-	_inherits(PlayerEntity, _Entity);
+var CharacterEntity = function (_Entity) {
+	_inherits(CharacterEntity, _Entity);
 
-	function PlayerEntity(game, level) {
-		_classCallCheck(this, PlayerEntity);
+	function CharacterEntity(game, level) {
+		_classCallCheck(this, CharacterEntity);
 
-		var _this4 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
+		var _this4 = _possibleConstructorReturn(this, Object.getPrototypeOf(CharacterEntity).call(this, game, level));
 
 		_this4.level = level;
 		_this4.x = _this4.level.player.x;
 		_this4.tileX = 2;
 		_this4.tileY = 1;
 		_this4.y = _this4.level.player.y;
-		window.onkeydown = function (event) {
-			if (_this4.game.isJumpingOver) {
-				return;
-			}
-			if (event.code == 'ArrowUp') {
-				_this4.moveY = -.3;
-			}
-			if (event.code == 'ArrowDown') {
-				_this4.moveY = .3;
-			}
-			if (event.code == 'ArrowLeft') {
-				_this4.moveX = -.3;
-			}
-			if (event.code == 'ArrowRight') {
-				_this4.moveX = .3;
-			}
-			if (event.code == 'KeyA') {
-				_this4.moveZ = 1;
-			}
-		};
-		window.onkeyup = function (event) {
-			if (_this4.game.isJumpingOver) {
-				return;
-			}
-			if (event.code == 'ArrowUp') {
-				_this4.moveY = -0;
-			}
-			if (event.code == 'ArrowDown') {
-				_this4.moveY = 0;
-			}
-			if (event.code == 'ArrowLeft') {
-				_this4.moveX = -0;
-			}
-			if (event.code == 'ArrowRight') {
-				_this4.moveX = 0;
-			}
-			if (event.code == 'KeyA') {
-				_this4.moveZ = 0;
-			}
-		};
+
 		return _this4;
 	}
 
-	_createClass(PlayerEntity, [{
+	_createClass(CharacterEntity, [{
+		key: 'turnRight',
+		value: function turnRight() {
+
+			this.tileX = 4;
+		}
+	}, {
+		key: 'turnLeft',
+		value: function turnLeft() {
+
+			this.tileX = 5;
+		}
+	}, {
+		key: 'turnUp',
+		value: function turnUp() {
+
+			this.tileX = 2;
+		}
+	}, {
+		key: 'turnDown',
+		value: function turnDown() {
+
+			this.tileX = 3;
+		}
+	}, {
+		key: 'walkLeft',
+		value: function walkLeft() {
+			this.turnLeft();
+			this.moveX = -.3;
+		}
+	}, {
+		key: 'walkRight',
+		value: function walkRight() {
+			this.turnRight();
+			this.moveX = .3;
+		}
+	}, {
+		key: 'walkUp',
+		value: function walkUp() {
+			this.moveY = -.3;
+			this.turnUp();
+		}
+	}, {
+		key: 'walkDown',
+		value: function walkDown() {
+			this.moveY = .3;
+			this.turnDown();
+		}
+	}, {
+		key: 'jump',
+		value: function jump() {
+			this.moveZ = 1;
+		}
+	}, {
 		key: 'render',
 		value: function render() {}
 	}]);
 
-	return PlayerEntity;
+	return CharacterEntity;
 }(Entity);
+
+var PlayerEntity = function (_CharacterEntity) {
+	_inherits(PlayerEntity, _CharacterEntity);
+
+	function PlayerEntity(game, level) {
+		_classCallCheck(this, PlayerEntity);
+
+		var _this5 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
+
+		window.onkeydown = function (event) {
+			if (_this5.game.isJumpingOver) {
+				return;
+			}
+			if (event.code == 'ArrowUp') {
+				_this5.walkUp();
+			}
+			if (event.code == 'ArrowDown') {
+				_this5.walkDown();
+			}
+			if (event.code == 'ArrowLeft') {
+				_this5.walkLeft();
+			}
+			if (event.code == 'ArrowRight') {
+				_this5.walkRight();
+			}
+			if (event.code == 'KeyA') {
+				_this5.jump();
+			}
+		};
+		window.onkeyup = function (event) {
+			if (_this5.game.isJumpingOver) {
+				return;
+			}
+			if (event.code == 'ArrowUp') {
+				_this5.moveY = -0;
+			}
+			if (event.code == 'ArrowDown') {
+				_this5.moveY = 0;
+			}
+			if (event.code == 'ArrowLeft') {
+				_this5.moveX = -0;
+			}
+			if (event.code == 'ArrowRight') {
+				_this5.moveX = 0;
+			}
+			if (event.code == 'KeyA') {
+				_this5.moveZ = 0;
+			}
+		};
+
+		return _this5;
+	}
+
+	return PlayerEntity;
+}(CharacterEntity);
 
 var Block = function Block(tile) {
 	_classCallCheck(this, Block);
