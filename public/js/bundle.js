@@ -201,6 +201,14 @@ var Tilda = exports.Tilda = function () {
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
+		this.status = {
+			yin: 0,
+			yang: 0,
+			points: 0,
+			exp: 0,
+			settings: {},
+			level: null
+		};
 		var xmlHttp = new XMLHttpRequest();
 
 		xmlHttp.onreadystatechange = function () {
@@ -467,6 +475,10 @@ var Tilda = exports.Tilda = function () {
 			this.renderer.context.strokeWidth = '1px';
 			this.renderer.context.rect(this.editor.selectedX * TILE_SIZE, this.editor.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 			this.renderer.context.stroke();
+
+			this.renderer.context.font = "11px Courier";
+			this.renderer.context.fillStyle = 'black';
+			this.renderer.context.fillText('points ' + this.status.points, 2, 12);
 		}
 	}]);
 
