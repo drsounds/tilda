@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html ng-app="tildaApp">
 	<head>
 		<title>Tilda</title>
 		<base href="https://tilda-drsounds.c9users.io/">
+		<script src="js/jquery-1.12.3.js"></script>
 		<style>
 		body {
 			background-color: #eee;
@@ -44,6 +45,15 @@
 					<canvas></canvas>
 				</td>
 				<td><iframe id="toolbar" style="height: 500px" src="/tileset.html"></iframe></td>
+			</tr>
+			<tr>
+				<td colspan="3">
+					<h3>Level message</h3>
+					<textarea id="script" onblur="saveFields(event)"></textarea>
+						
+				
+					
+				</td>
 			</tr>
 		</table>
 		

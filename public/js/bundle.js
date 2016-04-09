@@ -23,11 +23,17 @@ window.addEventListener('load', function () {
 		var iframe = document.createElement('iframe');
 		iframe.style.height = 1200;
 		game.propertiesWindow = document.querySelector('iframe#properties');
+		$('#script').val(game.level.script);
 	});
+	window.saveFields = function () {
+		game.level.script = $('#script').val();
+		game.level.save();
+	};
 	game.addEventListener('levelchanged', function (event) {
 		history.pushState({
 			level: event.data.level.id
 		}, 'Level', '/level/' + event.data.level.id);
+		$('#script').val(game.level.script);
 	});
 });
 
@@ -128,7 +134,7 @@ var CanvasRenderer = exports.CanvasRenderer = function (_Renderer) {
 	return CanvasRenderer;
 }(Renderer);
 
-var Tilda = exports.Tilda = function () {
+var Tilda = function () {
 	_createClass(Tilda, [{
 		key: 'dispatchEvent',
 		value: function dispatchEvent(event) {
@@ -226,6 +232,7 @@ var Tilda = exports.Tilda = function () {
 			flags: [],
 			level: null
 		};
+		this.text = '';
 		var xmlHttp = new XMLHttpRequest();
 
 		xmlHttp.onreadystatechange = function () {
@@ -358,8 +365,16 @@ var Tilda = exports.Tilda = function () {
 			evt.data = {
 				level: level
 			};
-
+			if ('script' in level) {
+				var func = new Function(level.script);
+				func.call(this);
+			}
 			this.dispatchEvent(evt);
+		}
+	}, {
+		key: 'message',
+		value: function message(_message) {
+			this.text = _message;
 		}
 	}, {
 		key: 'tick',
@@ -423,6 +438,10 @@ var Tilda = exports.Tilda = function () {
 						}
 
 						if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
+							if (block.script.length > 0) {
+								var func = new Function(block.script);
+								func.apply(this);
+							}
 							if (block.teleport) {
 								if (block.teleport.level) {
 									this.loadLevel(block.teleport.level);
@@ -448,6 +467,8 @@ var Tilda = exports.Tilda = function () {
 	}, {
 		key: 'render',
 		value: function render() {
+			var _this4 = this;
+
 			this.renderer.clear();
 			if (this.level) {
 				for (var x in this.level.blocks) {
@@ -511,11 +532,47 @@ var Tilda = exports.Tilda = function () {
 			this.renderer.context.font = "11px Courier";
 			this.renderer.context.fillStyle = 'black';
 			this.renderer.context.fillText('points ' + this.status.points, 2, 12);
+			if (this.text && this.text.length > 0) {
+				this.renderer.context.fillStyle = 'rgba(0, 0, 0, .8)';
+				this.renderer.context.fillRect(10, 22, 180, 60);
+				this.renderer.context.fillStyle = 'white';
+				wrapText(this.renderer.context, this.text, 22, 32, 180, 9);
+				setTimeout(function () {
+					_this4.text = '';
+				}, 1000);
+			}
 		}
 	}]);
 
 	return Tilda;
 }();
+
+// From http://stackoverflow.com/questions/2936112/text-wrap-in-a-canvas-element
+
+
+exports.Tilda = Tilda;
+function wrapText(context, text, x, y, line_width, line_height) {
+	var line = '';
+	var paragraphs = text.split('\n');
+	for (var i = 0; i < paragraphs.length; i++) {
+		var words = paragraphs[i].split(' ');
+		for (var n = 0; n < words.length; n++) {
+			var testLine = line + words[n] + ' ';
+			var metrics = context.measureText(testLine);
+			var testWidth = metrics.width;
+			if (testWidth > line_width && n > 0) {
+				context.fillText(line, x, y);
+				line = words[n] + ' ';
+				y += line_height;
+			} else {
+				line = testLine;
+			}
+		}
+		context.fillText(line, x, y);
+		y += line_height;
+		line = '';
+	}
+}
 
 var Entity = function () {
 	function Entity(game, level) {
@@ -567,15 +624,15 @@ var CharacterEntity = function (_Entity) {
 	function CharacterEntity(game, level) {
 		_classCallCheck(this, CharacterEntity);
 
-		var _this4 = _possibleConstructorReturn(this, Object.getPrototypeOf(CharacterEntity).call(this, game, level));
+		var _this5 = _possibleConstructorReturn(this, Object.getPrototypeOf(CharacterEntity).call(this, game, level));
 
-		_this4.level = level;
-		_this4.x = _this4.level.player.x;
-		_this4.tileX = 2;
-		_this4.tileY = 1;
-		_this4.y = _this4.level.player.y;
+		_this5.level = level;
+		_this5.x = _this5.level.player.x;
+		_this5.tileX = 2;
+		_this5.tileY = 1;
+		_this5.y = _this5.level.player.y;
 
-		return _this4;
+		return _this5;
 	}
 
 	_createClass(CharacterEntity, [{
@@ -645,59 +702,60 @@ var PlayerEntity = function (_CharacterEntity) {
 	function PlayerEntity(game, level) {
 		_classCallCheck(this, PlayerEntity);
 
-		var _this5 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
+		var _this6 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
 
 		window.onkeydown = function (event) {
-			if (_this5.game.isJumpingOver) {
+			if (_this6.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				_this5.walkUp();
+				_this6.walkUp();
 			}
 			if (event.code == 'ArrowDown') {
-				_this5.walkDown();
+				_this6.walkDown();
 			}
 			if (event.code == 'ArrowLeft') {
-				_this5.walkLeft();
+				_this6.walkLeft();
 			}
 			if (event.code == 'ArrowRight') {
-				_this5.walkRight();
+				_this6.walkRight();
 			}
 			if (event.code == 'KeyA') {
-				if (_this5.game.activeBlock) {
-					if (_this5.game.activeBlock.script.length > 0) {
-						var func = new Function(_this5.game.activeBlock.script);
-						func.apply(_this5.game);
+				if (_this6.game.activeBlock) {
+					if (_this6.game.activeBlock.script.length > 0) {
+						var func = new Function(_this6.game.activeBlock.script);
+						func.apply(_this6.game);
 					}
 
-					_this5.game.activeBlock = null;
+					_this6.game.text = '';
+					_this6.game.activeBlock = null;
 					return;
 				}
-				_this5.jump();
+				_this6.jump();
 			}
 		};
 		window.onkeyup = function (event) {
-			if (_this5.game.isJumpingOver) {
+			if (_this6.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				_this5.moveY = -0;
+				_this6.moveY = -0;
 			}
 			if (event.code == 'ArrowDown') {
-				_this5.moveY = 0;
+				_this6.moveY = 0;
 			}
 			if (event.code == 'ArrowLeft') {
-				_this5.moveX = -0;
+				_this6.moveX = -0;
 			}
 			if (event.code == 'ArrowRight') {
-				_this5.moveX = 0;
+				_this6.moveX = 0;
 			}
 			if (event.code == 'KeyA') {
-				_this5.moveZ = 0;
+				_this6.moveZ = 0;
 			}
 		};
 
-		return _this5;
+		return _this6;
 	}
 
 	return PlayerEntity;
@@ -736,6 +794,7 @@ var Level = function () {
 		value: function save() {
 			var jsonData = {
 				blocks: [],
+				script: this.script,
 				player: {
 					x: this.player.x,
 					y: this.player.y
@@ -776,6 +835,7 @@ var Level = function () {
 		this.name = level.name;
 		this.blocks = {};
 		this.flags = level.flags;
+		this.script = level.script;
 		this.objects = [];
 		for (var i in level.blocks) {
 			var block = level.blocks[i];

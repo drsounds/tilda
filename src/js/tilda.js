@@ -154,6 +154,7 @@ export class Tilda {
 			flags: [],
 			level: null
 		}
+		this.text = '';
 		var xmlHttp = new XMLHttpRequest();
 	
 		xmlHttp.onreadystatechange = () => {
@@ -287,10 +288,17 @@ export class Tilda {
 		evt.data = {
 			level: level
 		};
-		
+		if ('script' in level) {
+			var func = new Function(level.script);
+			func.call(this);
+		}
 		this.dispatchEvent(evt);
 	}
-
+	
+	message(message) {
+		this.text = message;
+	}
+	
 	tick() {
 		for (var i in this.level.objects) {
 			var obj = this.level.objects[i];
@@ -352,6 +360,11 @@ export class Tilda {
 					}
 
 					if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
+						if (block.script.length > 0) {
+							var func = new Function(block.script);
+							func.apply(this);
+						
+						}
 						if (block.teleport) {
 							if (block.teleport.level) {
 								this.loadLevel(block.teleport.level);
@@ -376,7 +389,7 @@ export class Tilda {
 			}
 		}
 	}
-
+	
 	render() {
 		this.renderer.clear();
 		if (this.level) {
@@ -442,7 +455,47 @@ export class Tilda {
 		this.renderer.context.font = "11px Courier";
 		this.renderer.context.fillStyle = 'black';
 		this.renderer.context.fillText(`points ${this.status.points}`, 2, 12);
+		if (this.text && this.text.length > 0) {
+			this.renderer.context.fillStyle = 'rgba(0, 0, 0, .8)';
+			this.renderer.context.fillRect(10, 22, 180, 60);
+			this.renderer.context.fillStyle = 'white';
+			wrapText(this.renderer.context, this.text, 22, 32, 180, 9);
+			setTimeout( () => {
+				this.text = '';
+			}, 1000);
+		}
 	}
+}
+
+
+// From http://stackoverflow.com/questions/2936112/text-wrap-in-a-canvas-element
+function wrapText(context, text, x, y, line_width, line_height)
+{
+    var line = '';
+    var paragraphs = text.split('\n');
+    for (var i = 0; i < paragraphs.length; i++)
+    {
+        var words = paragraphs[i].split(' ');
+        for (var n = 0; n < words.length; n++)
+        {
+            var testLine = line + words[n] + ' ';
+            var metrics = context.measureText(testLine);
+            var testWidth = metrics.width;
+            if (testWidth > line_width && n > 0)
+            {
+                context.fillText(line, x, y);
+                line = words[n] + ' ';
+                y += line_height;
+            }
+            else
+            {
+                line = testLine;
+            }
+        }
+        context.fillText(line, x, y);
+        y += line_height;
+        line = '';
+    }
 }
 
 
@@ -571,7 +624,7 @@ class PlayerEntity extends CharacterEntity {
 						func.apply(this.game);
 					}
 					
-					
+					this.game.text = '';
 					this.game.activeBlock = null;
 					return;
 				}
@@ -633,6 +686,7 @@ class Level {
 	save() {
 		var jsonData = {
 			blocks:[],
+			script: this.script,
 			player: {
 				x: this.player.x,
 				y: this.player.y
@@ -670,6 +724,7 @@ class Level {
 		this.name = level.name;
 		this.blocks = {};
 		this.flags = level.flags;
+		this.script = level.script;
 		this.objects = [];
 		for (var i in level.blocks) {
 			var block = level.blocks[i];
