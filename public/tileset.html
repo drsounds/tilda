@@ -8,6 +8,7 @@
 		    width: 100%;
 		    height: 100%;
 		    margin: 0;
+		    background-repeat: no-repeat;
 		    padding: 0;
 		      background-image: url('img/tileset.png');
                  
@@ -25,10 +26,10 @@
         function Block(tile) {
         	
         		var parts = tile.split(' ');
-        		this.tileX = parseInt(parts[0]);
-        		this.tileY = parseInt(parts[1]);
-        	
-        		this.flags = parseInt(parts[2]);
+        		this.id = (parts[0])
+        		this.tileX = parseInt(parts[1]);
+        		this.tileY = parseInt(parts[2]);
+        		this.flags = parseInt(parts[3]);
         	
         }
         var tiles = [];
@@ -39,8 +40,11 @@
                 if (xmlHttp.status == 200) {
                     var lines = xmlHttp.responseText.split('\n');
                     for (var i in lines) {
-                        tiles.push(new Block(lines[i]));
+                        var blockType = (new Block(lines[i]));
+                    
+                        tiles.push(blockType);
                     }
+                    console.log(tiles);
                     
                 } else {
                     debugger;
@@ -60,17 +64,25 @@
             selection.style.height = TILE_SIZE + 'px';
             selection.style.left = (tileX * TILE_SIZE) + 'px';
             selection.style.top = (tileY * TILE_SIZE) + 'px';
-            var id = -1;
+            var type = null;
+            var tool = 0;
+            if (tileX == 0 && tileY == 0) {
+                tool = 0;
+            } else {
+                tool = 1;
+            }
             for(var t in tiles) {
                 var tile = tiles[t];
                 if (tile.tileX == tileX && tile.tileY == tileY) {
-                   id = tile.id;
+                    console.log(tile);
+                   type = tile.id;
                 }
             }
-            console.log("A");
-            window.opener.postMessage({
+            console.log(type);
+            window.parent.postMessage({
                 action: 'put',
-                blockType: id,
+                blockType: type,
+                tool: tool,
                 layer: 0
             }, '*');
         });

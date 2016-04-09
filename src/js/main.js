@@ -13,6 +13,12 @@ window.addEventListener('load', () => {
 	
 	game.loadLevel(level).then((level) => {
 	   game.start(); 
+	   var iframe = document.createElement('iframe');
+	   document.body.appendChild(iframe);
+	   iframe.src = ('tileset.html');
+	   game.propertiesWindow = document.createElement('iframe');
+	   document.body.appendChild(game.propertiesWindow);
+		 game.propertiesWindow.src = ('properties.html');
 	});
 	game.addEventListener('levelchanged', function (event) {
 		history.pushState(

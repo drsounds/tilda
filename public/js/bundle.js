@@ -20,6 +20,12 @@ window.addEventListener('load', function () {
 
 	game.loadLevel(level).then(function (level) {
 		game.start();
+		var iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		iframe.src = 'tileset.html';
+		game.propertiesWindow = document.createElement('iframe');
+		document.body.appendChild(game.propertiesWindow);
+		game.propertiesWindow.src = 'properties.html';
 	});
 	game.addEventListener('levelchanged', function (event) {
 		history.pushState({
@@ -138,6 +144,27 @@ var Tilda = exports.Tilda = function () {
 		value: function addEventListener(eventId, callback) {
 			this['on' + eventId] = callback;
 		}
+	}, {
+		key: 'getPostionFromCursor',
+		value: function getPostionFromCursor() {
+			var width = this.renderer.canvas.width;
+			var height = this.renderer.canvas.height;
+			var pageWidth = this.renderer.canvas.getBoundingClientRect().width;
+			var pageHeight = this.renderer.canvas.getBoundingClientRect().height;
+
+			var cx = width;
+			var cy = height;
+
+			var x = (event.pageX - this.renderer.canvas.getBoundingClientRect().left) / pageWidth * cx;
+			var y = event.pageY / pageHeight * cy;
+
+			var selectedX = Math.floor((x + 1) / TILE_SIZE);
+			var selectedY = Math.floor((y + 1) / TILE_SIZE);
+			return {
+				x: selectedX,
+				y: selectedY
+			};
+		}
 	}]);
 
 	function Tilda(renderer) {
@@ -158,7 +185,10 @@ var Tilda = exports.Tilda = function () {
 		this.level = null;
 		this.blockTypes = {};
 		this.editor = {
-			activeBlockType: 2
+			selectedX: 0,
+			tool: TOOL_POINTER,
+			selectedY: 0,
+			activeBlockType: 15
 		};
 		this.cameraX = 0;
 		this.activeTile = {
@@ -192,36 +222,47 @@ var Tilda = exports.Tilda = function () {
 			if (_this2.mode != MODE_EDITING) {
 				return;
 			}
-			var width = _this2.renderer.canvas.width;
-			var height = _this2.renderer.canvas.height;
-			var pageWidth = _this2.renderer.canvas.getBoundingClientRect().width;
-			var pageHeight = _this2.renderer.canvas.getBoundingClientRect().height;
+			var pos = _this2.getPostionFromCursor();
 
-			var cx = width;
-			var cy = height;
+			if (event.which == 1) {
 
-			var x = (event.pageX - _this2.renderer.canvas.getBoundingClientRect().left) / pageWidth * cx;
-			var y = event.pageY / pageHeight * cy;
+				switch (_this2.editor.tool) {
+					case TOOL_DRAW:
+						_this2.level.setBlock(pos.x, pos.y, {
+							x: pos.x,
+							y: pos.y,
+							type: _this2.editor.activeBlockType
+						});
+						break;
+					case TOOL_POINTER:
+						_this2.editor.selectedX = pos.x;
+						_this2.editor.selectedY = pos.y;
+						_this2.propertiesWindow.contentWindow.postMessage({
+							block: _this2.level.blocks[_this2.editor.selectedX][_this2.editor.selectedY]
 
-			_this2.selectedX = Math.floor((x + 1) / TILE_SIZE);
-			_this2.selectedY = Math.floor((y + 1) / TILE_SIZE);
-			if (_this2.editor.activeBlockType == null) return;
-			_this2.level.setBlock(_this2.selectedX, _this2.selectedY, _this2.editor.activeBlockType);
-
-			_this2.level.save();
+						}, '*');
+						break;
+				}
+				_this2.level.save();
+			}
+			if (event.which == 3) {
+				event.preventDefault();
+				_this2.level.removeBlock(pos.x, pos.y);
+				_this2.level.save();
+			}
 		});
 		window.addEventListener('message', function (event) {
-			if (event.data.tile) {
-				var tileX = event.data.tile.x;
-				var tileY = event.data.tile.y;
-				_this2.activeTile.x = tileX;
-				_this2.activeTile.flags = event.data.tile.flags;
-				_this2.activeTile.y = tileY;
-				if (tileX == 0 && tileY == 0) {
-					_this2.activeTool = TOOL_POINTER;
-				} else {
+			_this2.editor.tool = event.data.tool;
+			if ('blockType' in event.data) {
+				if (event.data.blockType != null) {
 					_this2.activeTool = TOOL_DRAW;
+					_this2.editor.activeBlockType = event.data.blockType;
+				} else {
+					_this2.activeTool = TOOL_POINTER;
 				}
+			}
+			if ('block' in event.data) {
+				_this2.level.blocks[event.data.block.x][event.data.block.y] = event.data.block;
 			}
 		});
 	}
@@ -313,7 +354,7 @@ var Tilda = exports.Tilda = function () {
 						if (!block) {
 							return;
 						}
-						var blockType = this.blockTypes[block];
+						var blockType = this.blockTypes[block.type];
 						if (!blockType) {
 							continue;
 						}
@@ -381,7 +422,7 @@ var Tilda = exports.Tilda = function () {
 						if (!block) {
 							return;
 						}
-						var type = this.blockTypes[block];
+						var type = this.blockTypes[block.type];
 						if (!type) {
 							continue;
 						}
@@ -423,9 +464,9 @@ var Tilda = exports.Tilda = function () {
 			var height = TILE_SIZE * this.zoom.y;
 			this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - TILE_SIZE * 2, TILE_SIZE, TILE_SIZE, this.activeTile.x * TILE_SIZE, this.activeTile.x * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
-			/*	this.renderer.context.strokeStyle = 'yellow';
-   	this.renderer.context.rect(this.selectedX * TILE_SIZE, this.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-   	this.renderer.context.stroke();*/
+			this.renderer.context.strokeStyle = 'yellow';
+			this.renderer.context.rect(this.editor.selectedX * TILE_SIZE, this.editor.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+			this.renderer.context.stroke();
 		}
 	}]);
 
@@ -564,6 +605,11 @@ var Level = function () {
 			this.blocks[x][y] = block;
 		}
 	}, {
+		key: 'removeBlock',
+		value: function removeBlock(x, y) {
+			delete this.blocks[x][y];
+		}
+	}, {
 		key: 'save',
 		value: function save() {
 			var jsonData = {
@@ -580,11 +626,7 @@ var Level = function () {
 					if (!block) {
 						return;
 					}
-					jsonData.blocks.push({
-						x: x,
-						y: y,
-						type: block
-					});
+					jsonData.blocks.push(block);
 				}
 			}
 
@@ -615,7 +657,7 @@ var Level = function () {
 		this.objects = [];
 		for (var i in level.blocks) {
 			var block = level.blocks[i];
-			this.setBlock(block.x, block.y, block.type);
+			this.setBlock(block.x, block.y, block);
 		}
 		this.player = new PlayerEntity(game, level);
 		this.objects.push(this.player);

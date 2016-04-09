@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Properties</title>
+    </head>
+    <body>
+        
+        <h1>Properties</h1>
+        
+        <table>
+            <tr>
+                <td>Position</td>
+            </tr>
+            <tr>
+                <td>Teleport</td>
+                <td>
+                    Level:<br>
+                    <input type="text" onblur="save(event)" placeholder="Level id" id="teleport_level"><br>
+                    X:<br>
+                    <input type="number" onblur="save(event)" id="teleport_x"><br>
+                    Y:<br>
+                    <input type="number" onblur="save(event)" id="teleport_y"><br>
+                </td>
+            </tr>
+            <tr>
+                <td>Script</td>
+                <td>
+                    <textarea onblur="save(event)" id="script">
+                        
+                    </textarea>
+                    
+                </td>
+            </tr>
+        </table>
+        <button onclick="save()">Save properties</button>
+        <script src="js/jquery-1.12.3.js"></script>
+        <script>
+            var block;
+            window.addEventListener('message', function (event) {
+                if ('block' in event.data) {
+                    block = event.data.block;
+                    if (!block.teleport) {
+                        block.teleport = {
+                            x: 0,
+                            y: 0,
+                            level: null
+                        };
+                    }
+                    $('#teleport_x').val(block.teleport.x);
+                    $('#teleport_y').val(block.teleport.y);
+                    $('#teleport_level').val(block.teleport.level);
+                    $('#script').val(block.script);
+                }
+            });
+            function save() {
+                
+                block.script = $('#script').val();
+                block.teleport = {
+                    x: $('#teleport_x').val(),
+                    y: $('#teleport_y').val(),
+                    level: $('#teleport_level').val()
+                };
+                window.parent.postMessage({
+                    block: block
+                }, '*');
+            }
+            
+        </script>
+    </body>
+</html>
