@@ -92,6 +92,16 @@ var Renderer = function () {
 	return Renderer;
 }();
 
+var Setence = function Setence(setence) {
+	_classCallCheck(this, Setence);
+
+	var parts = setence.split(' ');
+	this.subject = parts[0];
+	this.predicate = parts[1];
+	this.object = parts[2];
+	this.duration = parts[3];
+};
+
 var CanvasRenderer = exports.CanvasRenderer = function (_Renderer) {
 	_inherits(CanvasRenderer, _Renderer);
 
@@ -146,6 +156,25 @@ var Tilda = function () {
 		key: 'addEventListener',
 		value: function addEventListener(eventId, callback) {
 			this['on' + eventId] = callback;
+		}
+	}, {
+		key: 'seq',
+		value: function seq() {
+			this.sequence = arguments;
+		}
+	}, {
+		key: 'getObject',
+		value: function getObject(obj) {}
+	}, {
+		key: 'next',
+		value: function next() {
+			if (this.sequence.length < 1) {
+				return;
+			}
+			var nextOperation = this.sequence[0];
+			this.sequence.slice(1);
+
+			nextOperation.call(this);
 		}
 	}, {
 		key: 'getPostionFromCursor',
@@ -833,6 +862,7 @@ var Level = function () {
 
 		this.game = game;
 		this.name = level.name;
+		this.entities = {};
 		this.blocks = {};
 		this.flags = level.flags;
 		this.script = level.script;
@@ -842,6 +872,16 @@ var Level = function () {
 			this.setBlock(block.x, block.y, block);
 		}
 		this.player = new PlayerEntity(game, level);
+		if ('entities' in level) {
+			for (var e in level.entities) {
+				var _entity = level.entities[e];
+				var type = _entity.type;
+				var entity = new this[type](_entity);
+				this.objects.push(entity);
+				this.entities[_entity.id] = entity;
+			}
+		}
+
 		this.objects.push(this.player);
 	}
 

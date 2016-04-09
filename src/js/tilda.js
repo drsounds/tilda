@@ -36,6 +36,17 @@ class Renderer {
 	}
 }
 
+
+class Setence {
+	constructor(setence) {
+		var parts = setence.split(' ');
+		this.subject = parts[0];
+		this.predicate = parts[1];
+		this.object = parts[2];
+		this.duration = parts[3];
+	}
+}
+
 export class CanvasRenderer extends Renderer {
 	constructor(canvas) {
 		super();
@@ -74,6 +85,23 @@ export class Tilda {
 		this['on' + eventId] = callback;
 	}
 	
+	seq() {
+		this.sequence = arguments;
+	}
+	
+	getObject(obj) {
+		
+	}
+	
+	next() {
+		if (this.sequence.length < 1) {
+			return;
+		}
+		var nextOperation = this.sequence[0];
+		this.sequence.slice(1);
+		
+		nextOperation.call(this);
+	}
 	
 	getPostionFromCursor() {
 		var width = this.renderer.canvas.width;
@@ -109,8 +137,6 @@ export class Tilda {
 		}
 		return this.status.settings[setting];
 	}
-	
-	
 	
 	constructor (renderer) {
 		
@@ -722,6 +748,7 @@ class Level {
 	constructor(game, level) {
 		this.game = game;
 		this.name = level.name;
+		this.entities = {};
 		this.blocks = {};
 		this.flags = level.flags;
 		this.script = level.script;
@@ -731,6 +758,16 @@ class Level {
 			this.setBlock(block.x, block.y, block);
 		}
 		this.player = new PlayerEntity(game, level);
+		if ('entities' in level) {
+			for (var e in level.entities) {
+				var _entity = level.entities[e];	
+				var type = _entity.type;
+				var entity = new this[type](_entity);
+				this.objects.push(entity);
+				this.entities[_entity.id] = entity;
+			}
+		}
+		
 		this.objects.push(this.player);
 	}
 
