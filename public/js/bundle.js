@@ -145,6 +145,11 @@ var Tilda = exports.Tilda = function () {
 
 		_classCallCheck(this, Tilda);
 
+		this.gameWidth = 192;
+		this.gameHeight = 192;
+		renderer.canvas.width = this.gameWidth;
+		renderer.canvas.height = this.gameHeight;
+
 		this.renderer = renderer;
 		this.zoom = {
 			x: 1,
@@ -195,8 +200,8 @@ var Tilda = exports.Tilda = function () {
 			var cx = width;
 			var cy = height;
 
-			var x = event.pageX / pageWidth * cx;
-			var y = event.pageY / pageHeight * cy - TILE_SIZE;
+			var x = (event.pageX - _this2.renderer.canvas.getBoundingClientRect().left) / pageWidth * cx;
+			var y = event.pageY / pageHeight * cy;
 
 			_this2.selectedX = Math.floor((x + 1) / TILE_SIZE);
 			_this2.selectedY = Math.floor((y + 1) / TILE_SIZE);
@@ -365,7 +370,6 @@ var Tilda = exports.Tilda = function () {
 		key: 'render',
 		value: function render() {
 			this.renderer.clear();
-			this.renderer.translate(0, TILE_SIZE);
 			if (this.level) {
 				for (var x in this.level.blocks) {
 					for (var y in this.level.blocks[x]) {
@@ -409,6 +413,12 @@ var Tilda = exports.Tilda = function () {
 					//this.renderer.renderImageChunk(this.tileset, left, top, width, height, block.tileX * TILE_SIZE, block.tileY * TILE_SIZE, width, height);
 				}
 			}
+
+			// set camera
+			var clusterX = Math.floor((this.level.player.x + 1) / this.gameWidth);
+			var clusterY = Math.floor((this.level.player.y + 1) / this.gameHeight);
+			this.cameraX = clusterX * this.gameWidth;
+			this.cameraY = clusterY * this.gameHeight;
 			var width = TILE_SIZE * this.zoom.x;
 			var height = TILE_SIZE * this.zoom.y;
 			this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - TILE_SIZE * 2, TILE_SIZE, TILE_SIZE, this.activeTile.x * TILE_SIZE, this.activeTile.x * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -416,7 +426,6 @@ var Tilda = exports.Tilda = function () {
 			/*	this.renderer.context.strokeStyle = 'yellow';
    	this.renderer.context.rect(this.selectedX * TILE_SIZE, this.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
    	this.renderer.context.stroke();*/
-			this.renderer.translate(0, -TILE_SIZE);
 		}
 	}]);
 
