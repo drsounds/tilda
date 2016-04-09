@@ -78,11 +78,30 @@ export class Tilda {
 			activeTile: -1
 		};
 		this.cameraX = 0;
+		this.activeTile = -1;
 		this.cameraY = 0;
+		this.selectedX = 0;
+		this.controlsLocked = false;
+		this.selectedY = 0;
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
-		
+		window.addEventListener('click', (event) => {
+			var width = this.renderer.canvas.width;
+			var height = this.renderer.canvas.height;
+			var pageWidth = window.innerWidth;
+			var pageHeight = window.innerHeight;
+			
+			var cx = width;
+			var cy = height;
+			
+			var x = (event.pageX / pageWidth) * cx;
+			var y = (event.pageY / pageHeight) * cy;
+			
+			this.selectedX = Math.floor((x + 1) / TILE_SIZE);
+			this.selectedY = Math.floor((y + 1) / TILE_SIZE) ;
+			
+		})
 	}
 
 	start() {
@@ -142,9 +161,12 @@ export class Tilda {
 					var left = x * TILE_SIZE;
 					var top = y * TILE_SIZE;
 					var block = this.level.blocks[x][y];
-					var obj = this.blockTypes[block.type];
-					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.moveX > 0 && (obj.flags & TILE_SOLID)) {
-						if (obj.flags & TILE_FLAG_JUMP_LEFT) {
+					var blockType = this.blockTypes[block.type];
+					var is_solid = (blockType.flags & TILE_SOLID) == TILE_SOLID;
+					var obj = this.level.objects[i];
+					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && block.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.moveX > 0 && is_solid) {
+						if ((blockType.flags & TILE_FLAG_JUMP_LEFT) == TILE_FLAG_JUMP_LEFT) {
+							this.controlsLocked = true;
 							obj.moveX = -2;
 							obj.moveZ = 5;
 						} else {
@@ -152,9 +174,10 @@ export class Tilda {
 						}
 					}
 					
-					if (obj.x < left + TILE_SIZE && obj.x > left && obj.moveX < 0 && (obj.flags & TILE_SOLID)) {
+					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.x < left + TILE_SIZE && obj.x > left && obj.moveX < 0 && is_solid) {
 					
-						if (obj.flags & TILE_FLAG_JUMP_RIGHT) {
+						if ((blockType.flags & TILE_FLAG_JUMP_RIGHT)  == TILE_FLAG_JUMP_RIGHT) {
+							this.controlsLocked = true;
 							obj.moveX = 2;
 							obj.moveZ = 5;
 						} 
@@ -162,9 +185,10 @@ export class Tilda {
 						
 					}
 
-					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.moveY > 0 && (obj.flags & TILE_SOLID)) {
+					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.moveY > 0 && is_solid) {
 						
-						if (obj.flags & TILE_FLAG_JUMP_BOTTOM) {
+						if ((blockType.flags & TILE_FLAG_JUMP_BOTTOM)  == TILE_FLAG_JUMP_BOTTOM) {
+							this.controlsLocked = true;
 							obj.moveY = 2;
 							obj.moveZ = 5;
 						} else {
@@ -172,10 +196,11 @@ export class Tilda {
 						}
 					}
 
-					if (obj.x < top + TILE_SIZE && obj.y > top && obj.moveY < 0 && (obj.flags & TILE_SOLID)) {
-						if (obj.flags & TILE_FLAG_JUMP_BOTTOM) {
-							obj.moveY = 2;
-							obj.moveZ = 5;
+					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y < top + TILE_SIZE && obj.y > top - TILE_SIZE && obj.moveY < 0 && is_solid) {
+						if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
+							this.controlsLocked = true;
+							obj.moveY = -0.2;
+							obj.moveZ = 0.25;
 						} else {
 							obj.moveY = 0;
 						}
@@ -218,8 +243,19 @@ export class Tilda {
 				}
 				this.renderer.renderImageChunk(this.tileset, left, top, width, height, 0, TILE_SIZE * 1, width, height); 
 				this.renderer.renderImageChunk(this.tileset, left, top - zeta,  width, height, tileX, tileY, width, height);  // Render shadow
-				}
+			}
+			for (var i in this.blockTypes) {
+				var block = this.blockTypes[i];
+				var width = TILE_SIZE * this.zoom.x;
+				var height = TILE_SIZE * this.zoom.y;
+				var left = (i * TILE_SIZE) * this.zoom.x;
+				var top = (this.renderer.canvas.height ) - TILE_SIZE;
+				this.renderer.renderImageChunk(this.tileset, left, top, width, height, block.tileX * TILE_SIZE, block.tileY * TILE_SIZE, width, height);
+			}
 		}
+		this.renderer.context.strokeStyle = 'yellow';
+		this.renderer.context.rect(this.selectedX * TILE_SIZE, this.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+		this.renderer.context.stroke();
 	}
 }
 
@@ -245,6 +281,7 @@ class Entity {
 		this.z -= 0.1;
 		if (this.z < 0) {
 			this.moveZ = 0;
+			this.controlsLocked = false;
 			this.z = 0;
 		}
 	}
@@ -257,7 +294,11 @@ class Entity {
 class PlayerEntity extends Entity {
 	constructor(level) {
 		super(level);
+		this.level = level;
 		window.onkeydown = (event) => {
+			if (this.level.game.controlsLocked) {
+				return;
+			}
 			if (event.code == 'ArrowUp') {
 				this.moveY = -.1;
 			}
@@ -275,6 +316,9 @@ class PlayerEntity extends Entity {
 			}
 		}
 		window.onkeyup = (event) => {
+				if (this.level.game.controlsLocked) {
+				return;
+			}
 			if (event.code == 'ArrowUp') {
 				this.moveY = -0;
 			}
@@ -303,6 +347,7 @@ class Block {
 		var parts = tile.split(' ');
 		this.tileX = parseInt(parts[0]);
 		this.tileY = parseInt(parts[1]);
+	
 		this.flags = parseInt(parts[2]);
 	}
 }

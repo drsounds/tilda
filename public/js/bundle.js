@@ -100,6 +100,8 @@ var CanvasRenderer = exports.CanvasRenderer = function (_Renderer) {
 
 var Tilda = exports.Tilda = function () {
 	function Tilda(renderer) {
+		var _this2 = this;
+
 		_classCallCheck(this, Tilda);
 
 		this.renderer = renderer;
@@ -113,10 +115,29 @@ var Tilda = exports.Tilda = function () {
 			activeTile: -1
 		};
 		this.cameraX = 0;
+		this.activeTile = -1;
 		this.cameraY = 0;
+		this.selectedX = 0;
+		this.controlsLocked = false;
+		this.selectedY = 0;
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
+		window.addEventListener('click', function (event) {
+			var width = _this2.renderer.canvas.width;
+			var height = _this2.renderer.canvas.height;
+			var pageWidth = window.innerWidth;
+			var pageHeight = window.innerHeight;
+
+			var cx = width;
+			var cy = height;
+
+			var x = event.pageX / pageWidth * cx;
+			var y = event.pageY / pageHeight * cy;
+
+			_this2.selectedX = Math.floor((x + 1) / TILE_SIZE);
+			_this2.selectedY = Math.floor((y + 1) / TILE_SIZE);
+		});
 	}
 
 	_createClass(Tilda, [{
@@ -147,7 +168,7 @@ var Tilda = exports.Tilda = function () {
 	}, {
 		key: 'loadLevel',
 		value: function loadLevel(url) {
-			var _this2 = this;
+			var _this3 = this;
 
 			return new Promise(function (resolve, reject) {
 				var xmlHttp = new XMLHttpRequest();
@@ -155,8 +176,8 @@ var Tilda = exports.Tilda = function () {
 					if (xmlHttp.readyState == 4) {
 						if (xmlHttp.status == 200) {
 							var level = JSON.parse(xmlHttp.responseText);
-							level = new Level(_this2, level);
-							_this2.setLevel(level);
+							level = new Level(_this3, level);
+							_this3.setLevel(level);
 							resolve(level);
 						} else {
 							reject();
@@ -185,9 +206,12 @@ var Tilda = exports.Tilda = function () {
 						var left = x * TILE_SIZE;
 						var top = y * TILE_SIZE;
 						var block = this.level.blocks[x][y];
-						var obj = this.blockTypes[block.type];
-						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.moveX > 0 && obj.flags & TILE_SOLID) {
-							if (obj.flags & TILE_FLAG_JUMP_LEFT) {
+						var blockType = this.blockTypes[block.type];
+						var is_solid = (blockType.flags & TILE_SOLID) == TILE_SOLID;
+						var obj = this.level.objects[i];
+						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && block.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.moveX > 0 && is_solid) {
+							if ((blockType.flags & TILE_FLAG_JUMP_LEFT) == TILE_FLAG_JUMP_LEFT) {
+								this.controlsLocked = true;
 								obj.moveX = -2;
 								obj.moveZ = 5;
 							} else {
@@ -195,18 +219,20 @@ var Tilda = exports.Tilda = function () {
 							}
 						}
 
-						if (obj.x < left + TILE_SIZE && obj.x > left && obj.moveX < 0 && obj.flags & TILE_SOLID) {
+						if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.x < left + TILE_SIZE && obj.x > left && obj.moveX < 0 && is_solid) {
 
-							if (obj.flags & TILE_FLAG_JUMP_RIGHT) {
+							if ((blockType.flags & TILE_FLAG_JUMP_RIGHT) == TILE_FLAG_JUMP_RIGHT) {
+								this.controlsLocked = true;
 								obj.moveX = 2;
 								obj.moveZ = 5;
 							}
 							obj.moveX = 0;
 						}
 
-						if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.moveY > 0 && obj.flags & TILE_SOLID) {
+						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.moveY > 0 && is_solid) {
 
-							if (obj.flags & TILE_FLAG_JUMP_BOTTOM) {
+							if ((blockType.flags & TILE_FLAG_JUMP_BOTTOM) == TILE_FLAG_JUMP_BOTTOM) {
+								this.controlsLocked = true;
 								obj.moveY = 2;
 								obj.moveZ = 5;
 							} else {
@@ -214,10 +240,11 @@ var Tilda = exports.Tilda = function () {
 							}
 						}
 
-						if (obj.x < top + TILE_SIZE && obj.y > top && obj.moveY < 0 && obj.flags & TILE_SOLID) {
-							if (obj.flags & TILE_FLAG_JUMP_BOTTOM) {
-								obj.moveY = 2;
-								obj.moveZ = 5;
+						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y < top + TILE_SIZE && obj.y > top - TILE_SIZE && obj.moveY < 0 && is_solid) {
+							if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
+								this.controlsLocked = true;
+								obj.moveY = -0.2;
+								obj.moveZ = 0.25;
 							} else {
 								obj.moveY = 0;
 							}
@@ -258,7 +285,18 @@ var Tilda = exports.Tilda = function () {
 					this.renderer.renderImageChunk(this.tileset, left, top, width, height, 0, TILE_SIZE * 1, width, height);
 					this.renderer.renderImageChunk(this.tileset, left, top - zeta, width, height, tileX, tileY, width, height); // Render shadow
 				}
+				for (var i in this.blockTypes) {
+					var block = this.blockTypes[i];
+					var width = TILE_SIZE * this.zoom.x;
+					var height = TILE_SIZE * this.zoom.y;
+					var left = i * TILE_SIZE * this.zoom.x;
+					var top = this.renderer.canvas.height - TILE_SIZE;
+					this.renderer.renderImageChunk(this.tileset, left, top, width, height, block.tileX * TILE_SIZE, block.tileY * TILE_SIZE, width, height);
+				}
 			}
+			this.renderer.context.strokeStyle = 'yellow';
+			this.renderer.context.rect(this.selectedX * TILE_SIZE, this.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+			this.renderer.context.stroke();
 		}
 	}]);
 
@@ -290,6 +328,7 @@ var Entity = function () {
 			this.z -= 0.1;
 			if (this.z < 0) {
 				this.moveZ = 0;
+				this.controlsLocked = false;
 				this.z = 0;
 			}
 		}
@@ -307,43 +346,50 @@ var PlayerEntity = function (_Entity) {
 	function PlayerEntity(level) {
 		_classCallCheck(this, PlayerEntity);
 
-		var _this3 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, level));
+		var _this4 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, level));
 
+		_this4.level = level;
 		window.onkeydown = function (event) {
+			if (_this4.level.game.controlsLocked) {
+				return;
+			}
 			if (event.code == 'ArrowUp') {
-				_this3.moveY = -.1;
+				_this4.moveY = -.1;
 			}
 			if (event.code == 'ArrowDown') {
-				_this3.moveY = .1;
+				_this4.moveY = .1;
 			}
 			if (event.code == 'ArrowLeft') {
-				_this3.moveX = -0.1;
+				_this4.moveX = -0.1;
 			}
 			if (event.code == 'ArrowRight') {
-				_this3.moveX = .1;
+				_this4.moveX = .1;
 			}
 			if (event.code == 'KeyA') {
-				_this3.moveZ = 1;
+				_this4.moveZ = 1;
 			}
 		};
 		window.onkeyup = function (event) {
+			if (_this4.level.game.controlsLocked) {
+				return;
+			}
 			if (event.code == 'ArrowUp') {
-				_this3.moveY = -0;
+				_this4.moveY = -0;
 			}
 			if (event.code == 'ArrowDown') {
-				_this3.moveY = 0;
+				_this4.moveY = 0;
 			}
 			if (event.code == 'ArrowLeft') {
-				_this3.moveX = -0;
+				_this4.moveX = -0;
 			}
 			if (event.code == 'ArrowRight') {
-				_this3.moveX = 0;
+				_this4.moveX = 0;
 			}
 			if (event.code == 'KeyA') {
-				_this3.moveZ = 0;
+				_this4.moveZ = 0;
 			}
 		};
-		return _this3;
+		return _this4;
 	}
 
 	_createClass(PlayerEntity, [{
@@ -360,6 +406,7 @@ var Block = function Block(tile) {
 	var parts = tile.split(' ');
 	this.tileX = parseInt(parts[0]);
 	this.tileY = parseInt(parts[1]);
+
 	this.flags = parseInt(parts[2]);
 };
 
