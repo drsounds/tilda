@@ -95,6 +95,23 @@ export class Tilda {
 		};
 	}
 	
+	/**
+	 * Tells us if a certain flag is meet
+	 * */
+	hasFlag(flag) {
+		return this.status.flags.indexOf(flag) != -1;
+		
+	}
+	
+	getSetting(setting, defaultValue) {
+		if (!setting in this.status.settings) {
+			return defaultValue;
+		}
+		return this.status.settings[setting];
+	}
+	
+	
+	
 	constructor (renderer) {
 		
 		this.gameWidth = 192;
@@ -127,12 +144,14 @@ export class Tilda {
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
+		this.activeBlock = null;
 		this.status = {
 			yin: 0,
 			yang: 0,
 			points: 0,
 			exp: 0,
 			settings: {},
+			flags: [],
 			level: null
 		}
 		var xmlHttp = new XMLHttpRequest();
@@ -280,6 +299,7 @@ export class Tilda {
 		for (var x in this.level.blocks) {
 			for (var y in this.level.blocks[x]) {
 				for (var i in this.level.objects) {
+					var collidied = false;
 					var left = x * TILE_SIZE;
 					var top = y * TILE_SIZE;
 					var block = this.level.blocks[x][y];
@@ -312,12 +332,16 @@ export class Tilda {
 							obj.moveX = 3;
 							obj.moveZ = 3;
 						} 
-							obj.moveX = 0;
+						obj.moveX = 0;
 						
 					}
 
 					if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.moveY > 0 && is_solid) {
-						
+						if (block.teleport) {
+							if (block.teleport.level) {
+								this.loadLevel(block.teleport.level);
+							}
+						}
 						if ((blockType.flags & TILE_FLAG_JUMP_BOTTOM)  == TILE_FLAG_JUMP_BOTTOM) {
 							this.isJumpingOver = true;
 							obj.moveY = 1;
@@ -328,6 +352,11 @@ export class Tilda {
 					}
 
 					if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
+						if (block.teleport) {
+							if (block.teleport.level) {
+								this.loadLevel(block.teleport.level);
+							}
+						}
 						if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
 							this.isJumpingOver = true;
 							obj.moveY = -0.6;
@@ -335,8 +364,12 @@ export class Tilda {
 						} else {
 							obj.moveY = 0;
 						}
+						this.activeBlock = block;
+						collidied = true;
 					}
-
+					if (!collidied) {
+						this.activeBlock = null;
+					}
 
 				}
 
@@ -532,6 +565,16 @@ class PlayerEntity extends CharacterEntity {
 				this.walkRight();
 			}
 			if (event.code == 'KeyA') {
+				if (this.game.activeBlock) {
+					if (this.game.activeBlock.script.length > 0) {
+						var func = new Function(this.game.activeBlock.script);
+						func.apply(this.game);
+					}
+					
+					
+					this.game.activeBlock = null;
+					return;
+				}
 				this.jump();
 			}
 		}

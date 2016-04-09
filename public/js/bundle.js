@@ -21,11 +21,8 @@ window.addEventListener('load', function () {
 	game.loadLevel(level).then(function (level) {
 		game.start();
 		var iframe = document.createElement('iframe');
-		document.body.appendChild(iframe);
-		iframe.src = 'tileset.html';
-		game.propertiesWindow = document.createElement('iframe');
-		document.body.appendChild(game.propertiesWindow);
-		game.propertiesWindow.src = 'properties.html';
+		iframe.style.height = 1200;
+		game.propertiesWindow = document.querySelector('iframe#properties');
 	});
 	game.addEventListener('levelchanged', function (event) {
 		history.pushState({
@@ -165,6 +162,24 @@ var Tilda = exports.Tilda = function () {
 				y: selectedY
 			};
 		}
+
+		/**
+   * Tells us if a certain flag is meet
+   * */
+
+	}, {
+		key: 'hasFlag',
+		value: function hasFlag(flag) {
+			return this.status.flags.indexOf(flag) != -1;
+		}
+	}, {
+		key: 'getSetting',
+		value: function getSetting(setting, defaultValue) {
+			if (!setting in this.status.settings) {
+				return defaultValue;
+			}
+			return this.status.settings[setting];
+		}
 	}]);
 
 	function Tilda(renderer) {
@@ -201,12 +216,14 @@ var Tilda = exports.Tilda = function () {
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
+		this.activeBlock = null;
 		this.status = {
 			yin: 0,
 			yang: 0,
 			points: 0,
 			exp: 0,
 			settings: {},
+			flags: [],
 			level: null
 		};
 		var xmlHttp = new XMLHttpRequest();
@@ -354,6 +371,7 @@ var Tilda = exports.Tilda = function () {
 			for (var x in this.level.blocks) {
 				for (var y in this.level.blocks[x]) {
 					for (var i in this.level.objects) {
+						var collidied = false;
 						var left = x * TILE_SIZE;
 						var top = y * TILE_SIZE;
 						var block = this.level.blocks[x][y];
@@ -390,7 +408,11 @@ var Tilda = exports.Tilda = function () {
 						}
 
 						if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.moveY > 0 && is_solid) {
-
+							if (block.teleport) {
+								if (block.teleport.level) {
+									this.loadLevel(block.teleport.level);
+								}
+							}
 							if ((blockType.flags & TILE_FLAG_JUMP_BOTTOM) == TILE_FLAG_JUMP_BOTTOM) {
 								this.isJumpingOver = true;
 								obj.moveY = 1;
@@ -401,6 +423,11 @@ var Tilda = exports.Tilda = function () {
 						}
 
 						if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
+							if (block.teleport) {
+								if (block.teleport.level) {
+									this.loadLevel(block.teleport.level);
+								}
+							}
 							if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
 								this.isJumpingOver = true;
 								obj.moveY = -0.6;
@@ -408,6 +435,11 @@ var Tilda = exports.Tilda = function () {
 							} else {
 								obj.moveY = 0;
 							}
+							this.activeBlock = block;
+							collidied = true;
+						}
+						if (!collidied) {
+							this.activeBlock = null;
 						}
 					}
 				}
@@ -632,6 +664,15 @@ var PlayerEntity = function (_CharacterEntity) {
 				_this5.walkRight();
 			}
 			if (event.code == 'KeyA') {
+				if (_this5.game.activeBlock) {
+					if (_this5.game.activeBlock.script.length > 0) {
+						var func = new Function(_this5.game.activeBlock.script);
+						func.apply(_this5.game);
+					}
+
+					_this5.game.activeBlock = null;
+					return;
+				}
 				_this5.jump();
 			}
 		};

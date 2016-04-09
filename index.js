@@ -9,9 +9,14 @@ app.use('/', express.static(__dirname + '/public'));
 
 app.get('/api/levels/:level', function (req, res) {
     var level_name = req.params.level;
-    var data  = fs.readFileSync(__dirname + '/public/levels/' + level_name + '.json');
+    var path = __dirname + '/public/levels/' + level_name + '.json';
+    try{
+     var t = fs.statSync(path).isFile();
+    } catch (e) {
+        fs.writeFileSync(path, JSON.stringify({player: {x: 0, y: 0}, blocks: []}));
+    }
+    var data  = fs.readFileSync(path);
     var level = JSON.parse(data);
-    
     res.json(level);
 });
 

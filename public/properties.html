@@ -9,7 +9,13 @@
         
         <table>
             <tr>
-                <td>Position</td>
+                <td>Tao</td>
+                <td>
+                    Yin<br>
+                    <input type="number" id="yin" onchange="save(event)" value="1" min="-10" max="0"><br>
+                    Yang<br>
+                    <input type="number" id="yang" onchange="save(event)" value="1" min="0" max="10"><br>
+                </td>
             </tr>
             <tr>
                 <td>Teleport</td>
@@ -48,6 +54,8 @@
                     }
                     $('#teleport_x').val(block.teleport.x);
                     $('#teleport_y').val(block.teleport.y);
+                    $('#yin').val(block.yin);
+                    $('#yang').val(block.yang);
                     $('#teleport_level').val(block.teleport.level);
                     $('#script').val(block.script);
                 }
@@ -55,6 +63,8 @@
             function save() {
                 
                 block.script = $('#script').val();
+                block.yin = parseInt($('#yin').val());
+                block.yang = parseInt($('#yang').val());
                 block.teleport = {
                     x: $('#teleport_x').val(),
                     y: $('#teleport_y').val(),
