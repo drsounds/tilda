@@ -15,10 +15,20 @@
 		    height: 100%;
 		    touch-action: none;
 		  }
+		  canvas {
+		  image-rendering: optimizeSpeed;             /* Older versions of FF          */
+		  image-rendering: -moz-crisp-edges;          /* FF 6.0+                       */
+		  image-rendering: -webkit-optimize-contrast; /* Safari                        */
+		  image-rendering: -o-crisp-edges;            /* OS X & Windows Opera (12.02+) */
+		  image-rendering: pixelated;                 /* Awesome future-browsers       */
+		  -ms-interpolation-mode: nearest-neighbor;   /* IE                            */
+		}
 	    </style>
+	    <w
 	</head>
 	<body>
-		<canvas width="140" height="140"></canvas>
+		
+		<canvas width="128" height="128"></canvas>
 		<script src="js/bundle.js"></script>
 	</body>
 </html>

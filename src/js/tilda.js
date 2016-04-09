@@ -1,5 +1,5 @@
 const FLAG_SIDE_SCROLLING = 0x1;
-const TILE_SIZE = 14;
+const TILE_SIZE = 16;
 const NUM_SCREEN_TILES_X = 124;
 const NUM_SCREEN_TILES_Y = 128;
 const TILE_SOLID = 1;
@@ -9,21 +9,10 @@ const TILE_FLAG_JUMP_RIGHT = 8;
 const TILE_FLAG_JUMP_BOTTOM = 16;
 const GAME_READY = 0;
 const GAME_RUNNING = 1;
-var TILESET = `x y flags
-1 0 1
-2 0 5
-3 0 5
-4 0 1
-1 1 3
-2 1 1
-3 1 1
-4 1 8
-2 2 1
-3 2 1
-4 2 8
-1 3 1
-2 3 17
-3 3 17`;
+const TOOL_POINTER = 0;
+const TOOL_DRAW = 1;
+const TOOL_PROPERTIES = 2;
+var TILESET = ``;
 
 
 class Renderer {
@@ -32,7 +21,11 @@ class Renderer {
 	
 	loadImage(url) {
 	}
-
+	
+	translate(x, y) {
+		
+	}
+	
 	renderImageChunk(image, destX, destY, destWidth, destHeight, srcX, srcY, srcWidth, srcHeight) {
 
 	}
@@ -50,7 +43,12 @@ export class CanvasRenderer extends Renderer {
 	}
 	
 	clear() {
+		this.context.fillStyle = 'white';
 		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+	}
+	
+	translate(x, y) {
+		this.context.translate(x, y);
 	}
 	
 	loadImage(url) {
@@ -78,29 +76,93 @@ export class Tilda {
 			activeTile: -1
 		};
 		this.cameraX = 0;
-		this.activeTile = -1;
+		this.activeTile = {
+			x: 0, y: 0
+		};
 		this.cameraY = 0;
 		this.selectedX = 0;
-		this.controlsLocked = false;
+		this.activeTool = 0;
+		this.isJumpingOver = false;
 		this.selectedY = 0;
 		this.tileset = this.renderer.loadImage('img/tileset.png');
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
+		var xmlHttp = new XMLHttpRequest();
+	
+		xmlHttp.onreadystatechange = () => {
+		if (xmlHttp.readyState == 4) {
+		    if (xmlHttp.status == 200) {
+		        var lines = xmlHttp.responseText.split('\n');
+		        for (var i in lines) {
+		            this.blockTypes[i] = (new Block(lines[i]));
+		
+		        	
+		        }
+		        window.addEventListener('mousedown', (event) => {
+		            var x = event.pageX;
+		            var y = event.pageY;
+		            var TILE_SIZE = 16;
+		            var tileX = Math.floor((x + 1) / TILE_SIZE);
+		            var tileY = Math.floor((y + 1) / TILE_SIZE);
+		            var selection = document.querySelector('#selection');
+		            selection.style.width = TILE_SIZE + 'px';
+		            selection.style.height = TILE_SIZE + 'px';
+		            selection.style.left = (tileX * TILE_SIZE) + 'px';
+		            selection.style.top = (tileY * TILE_SIZE) + 'px';
+		            var flags = 0;
+		            for(var t in this.blockTypes) {
+		                var tile = this.blockTypes[t];
+		                if (tile.tileX == tileX && tile.tileY == tileY) {
+		                    flags = tile.flags;
+		                }
+		            }
+		            window.opener.postMessage({
+		                tile: {
+		                    x: tileX,
+		                    y: tileY,
+		                    flags: flags
+		                }
+		            }, '*');
+		        });
+		    } else {
+		    }
+		}
+		};
+		xmlHttp.open('GET', '/t.tileset', true);
+		xmlHttp.send(null);
 		window.addEventListener('click', (event) => {
 			var width = this.renderer.canvas.width;
 			var height = this.renderer.canvas.height;
-			var pageWidth = window.innerWidth;
-			var pageHeight = window.innerHeight;
+			var pageWidth = this.renderer.canvas.getBoundingClientRect().width;
+			var pageHeight = this.renderer.canvas.getBoundingClientRect().height;
 			
 			var cx = width;
 			var cy = height;
 			
 			var x = (event.pageX / pageWidth) * cx;
-			var y = (event.pageY / pageHeight) * cy;
+			var y = (event.pageY / pageHeight) * cy - TILE_SIZE;
 			
 			this.selectedX = Math.floor((x + 1) / TILE_SIZE);
 			this.selectedY = Math.floor((y + 1) / TILE_SIZE) ;
-			
+			if (this.activeTile.x > 0 && this.activeTile.y > 0) {
+				this.level.setBlock(x, y, new Block(
+					this.activeTile.x + ' ' + this.activeTile.y + ' ' + this.activeTile.flags	
+				));
+				
+			}
+		});
+		window.addEventListener('message', (event) => {
+			if (event.data.tile) {
+				var tileX = event.data.tile.x;
+				var tileY = event.data.tile.y;
+				this.activeTile.x = tileX;
+				this.activeTile.y = tileY;
+				if (tileX == 0 && tileY == 0) {
+					this.activeTool = TOOL_POINTER;
+				} else {
+					this.activeTool = TOOL_DRAW;
+				}	
+			}
 		})
 	}
 
@@ -162,45 +224,51 @@ export class Tilda {
 					var top = y * TILE_SIZE;
 					var block = this.level.blocks[x][y];
 					var blockType = this.blockTypes[block.type];
+					if (!blockType) {
+						continue;
+					}
+					if (this.isJumpingOver) {
+						return;
+					}
 					var is_solid = (blockType.flags & TILE_SOLID) == TILE_SOLID;
 					var obj = this.level.objects[i];
 					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && block.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.moveX > 0 && is_solid) {
 						if ((blockType.flags & TILE_FLAG_JUMP_LEFT) == TILE_FLAG_JUMP_LEFT) {
-							this.controlsLocked = true;
-							obj.moveX = -2;
+							this.isJumpingOver = true;
+							obj.moveX = -4;
 							obj.moveZ = 5;
 						} else {
 							obj.moveX = 0;
 						}
 					}
 					
-					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.x < left + TILE_SIZE && obj.x > left && obj.moveX < 0 && is_solid) {
+					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.x < left + TILE_SIZE && obj.x > left && obj.moveX < 0 && is_solid) {
 					
 						if ((blockType.flags & TILE_FLAG_JUMP_RIGHT)  == TILE_FLAG_JUMP_RIGHT) {
-							this.controlsLocked = true;
-							obj.moveX = 2;
-							obj.moveZ = 5;
+							this.isJumpingOver = true;
+							obj.moveX = 3;
+							obj.moveZ = 3;
 						} 
 							obj.moveX = 0;
 						
 					}
 
-					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.moveY > 0 && is_solid) {
+					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE / 2 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE && obj.moveY > 0 && is_solid) {
 						
 						if ((blockType.flags & TILE_FLAG_JUMP_BOTTOM)  == TILE_FLAG_JUMP_BOTTOM) {
-							this.controlsLocked = true;
-							obj.moveY = 2;
-							obj.moveZ = 5;
+							this.isJumpingOver = true;
+							obj.moveY = 1;
+							obj.moveZ = 1;
 						} else {
 							obj.moveY = 0;
 						}
 					}
 
-					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y < top + TILE_SIZE && obj.y > top - TILE_SIZE && obj.moveY < 0 && is_solid) {
+					if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE && obj.y < top + TILE_SIZE && obj.y > top - TILE_SIZE && obj.moveY < 0 && is_solid) {
 						if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
-							this.controlsLocked = true;
-							obj.moveY = -0.2;
-							obj.moveZ = 0.25;
+							this.isJumpingOver = true;
+							obj.moveY = -0.6;
+							obj.moveZ = 1;
 						} else {
 							obj.moveY = 0;
 						}
@@ -215,6 +283,7 @@ export class Tilda {
 
 	render() {
 		this.renderer.clear();
+		this.renderer.translate(0, TILE_SIZE);
 		if (this.level) {
 			for (var x in this.level.blocks) {
 				for (var y in this.level.blocks[x]) {
@@ -224,6 +293,9 @@ export class Tilda {
 					var height = TILE_SIZE * this.zoom.y;
 					var block = this.level.blocks[x][y];
 					var type = this.blockTypes[block.type];
+					if (!type) {
+						continue;
+					}
 					var tileX = type.tileX * TILE_SIZE;
 					var tileY = type.tileY * TILE_SIZE;
 					
@@ -249,19 +321,26 @@ export class Tilda {
 				var width = TILE_SIZE * this.zoom.x;
 				var height = TILE_SIZE * this.zoom.y;
 				var left = (i * TILE_SIZE) * this.zoom.x;
-				var top = (this.renderer.canvas.height ) - TILE_SIZE;
-				this.renderer.renderImageChunk(this.tileset, left, top, width, height, block.tileX * TILE_SIZE, block.tileY * TILE_SIZE, width, height);
+				var top = (this.renderer.canvas.height ) - TILE_SIZE * 2;
+				//this.renderer.renderImageChunk(this.tileset, left, top, width, height, block.tileX * TILE_SIZE, block.tileY * TILE_SIZE, width, height);
 			}
 		}
-		this.renderer.context.strokeStyle = 'yellow';
+		var width = TILE_SIZE * this.zoom.x;
+		var height = TILE_SIZE * this.zoom.y;
+		this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - TILE_SIZE * 2, TILE_SIZE, TILE_SIZE, this.activeTile.x * TILE_SIZE, this.activeTile.x * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+		
+	/*	this.renderer.context.strokeStyle = 'yellow';
 		this.renderer.context.rect(this.selectedX * TILE_SIZE, this.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-		this.renderer.context.stroke();
+		this.renderer.context.stroke();*/
+		this.renderer.translate(0, -TILE_SIZE);
 	}
 }
 
 
 class Entity {
-	constructor(level) {
+	constructor(game, level) {
+		this.level = level;
+		this.game = game;
 		this.moveX = 0;
 		this.moveY = 0;
 		this.moveZ = 0;
@@ -275,13 +354,17 @@ class Entity {
 		this.x += this.moveX;
 		this.y += this.moveY;
 		this.z += this.moveZ;
-		this.moveZ *= 0.9;
-		if (this.moveZ > 0) {
+		if (this.z > 0) {
+		this.moveZ -= 0.03;
 		}
-		this.z -= 0.1;
 		if (this.z < 0) {
 			this.moveZ = 0;
-			this.controlsLocked = false;
+			if (this.game.isJumpingOver) {
+				this.game.isJumpingOver = false;
+				this.moveX = 0;
+				
+				this.moveY = 0;
+			}
 			this.z = 0;
 		}
 	}
@@ -292,31 +375,35 @@ class Entity {
 
 
 class PlayerEntity extends Entity {
-	constructor(level) {
-		super(level);
+	constructor(game, level) {
+		super(game, level);
 		this.level = level;
+		this.x = this.level.player.x;
+		this.tileX = 2;
+		this.tileY = 1;
+		this.y = this.level.player.y;
 		window.onkeydown = (event) => {
-			if (this.level.game.controlsLocked) {
+			if (this.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				this.moveY = -.1;
+				this.moveY = -.3;
 			}
 			if (event.code == 'ArrowDown') {
-				this.moveY = .1;
+				this.moveY = .3;
 			}
 			if (event.code == 'ArrowLeft') {
-				this.moveX = -0.1;
+				this.moveX = -.3;
 			}
 			if (event.code == 'ArrowRight') {
-				this.moveX = .1;
+				this.moveX = .3;
 			}
 			if (event.code == 'KeyA') {
 				this.moveZ = 1;
 			}
 		}
 		window.onkeyup = (event) => {
-				if (this.level.game.controlsLocked) {
+			if (this.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
@@ -354,7 +441,6 @@ class Block {
 
 class Level {
 	setBlock(x, y, block) {
-		block.level = this;
 		if (!(x in this.blocks)) {
 			this.blocks[x] = {};
 		}
@@ -362,6 +448,7 @@ class Level {
 	}
 	constructor(game, level) {
 		this.game = game;
+
 		this.blocks = {};
 		this.flags = level.flags;
 		this.objects = [];
@@ -370,7 +457,7 @@ class Level {
 			var blockType = this.game.blockTypes[block.type];
 			this.setBlock(block.x, block.y, block);
 		}
-		this.objects.push(new PlayerEntity(level.player.x, level.player.y));
+		this.objects.push(new PlayerEntity(game, level));
 	}
 
 	render() {

@@ -5,5 +5,6 @@ window.addEventListener('load', () => {
 	var game = new Tilda(canvasRenderer);
 	game.loadLevel('levels/overworld.json').then((level) => {
 	   game.start(); 
+	   //window.open('tileset.html');
 	});
 });
