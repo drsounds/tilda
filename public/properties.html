@@ -5,59 +5,13 @@
     </head>
     <body>
         
-        <h1>Properties</h1>
         
-        <table>
-            <tr>
-                <td>Tao</td>
-                <td>
-                    Yin<br>
-                    <input type="number" id="yin" onchange="save(event)" value="1" min="-10" max="0"><br>
-                    Yang<br>
-                    <input type="number" id="yang" onchange="save(event)" value="1" min="0" max="10"><br>
-                </td>
-            </tr>
-            <tr>
-                <td>Teleport</td>
-                <td>
-                    Level:<br>
-                    <input type="text" onblur="save(event)" placeholder="Level id" id="teleport_level"><br>
-                    X:<br>
-                    <input type="number" onblur="save(event)" id="teleport_x"><br>
-                    Y:<br>
-                    <input type="number" onblur="save(event)" id="teleport_y"><br>
-                </td>
-            </tr>
-            <tr>
-                <td>Script</td>
-                <td>
-                    <textarea onblur="save(event)" id="script">
-                        
-                    </textarea>
-                    
-                </td>
-            </tr>
-        </table>
-        <button onclick="save()">Save properties</button>
         <script src="js/jquery-1.12.3.js"></script>
         <script>
             var block;
             window.addEventListener('message', function (event) {
                 if ('block' in event.data) {
-                    block = event.data.block;
-                    if (!block.teleport) {
-                        block.teleport = {
-                            x: 0,
-                            y: 0,
-                            level: null
-                        };
-                    }
-                    $('#teleport_x').val(block.teleport.x);
-                    $('#teleport_y').val(block.teleport.y);
-                    $('#yin').val(block.yin);
-                    $('#yang').val(block.yang);
-                    $('#teleport_level').val(block.teleport.level);
-                    $('#script').val(block.script);
+                    
                 }
             });
             function save() {

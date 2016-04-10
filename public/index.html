@@ -16,6 +16,13 @@
 		    padding: 0;
 		  }
 		
+		      #selection {
+		          left: 0px;
+		          top: 0px;
+		          position: absolute;
+		          
+		          border: 1px solid blue;
+		      }
 			canvas {
 				display: inline-block;
 				float: left;
@@ -36,26 +43,57 @@
 		  -ms-interpolation-mode: nearest-neighbor;   /* IE                            */
 		}
 	    </style>
+	    <link rel="stylesheet" href="css/dock-manager.css">
+<script src="js/ace.js" type="text/javascript" charset="utf-8"></script>
+<script src="js/dockspawn.js" type="text/javascript" charset="utf-8"></script>
 	</head>
 	<body>
-		<table width="100%" height="100%">
-			<tr>
-				<td><iframe id="properties" style="height:500px" src="/properties.html"></iframe></td>
-				<td style="text-align: center" width="100%">
-					<canvas></canvas>
-				</td>
-				<td><iframe id="toolbar" style="height: 500px" src="/tileset.html"></iframe></td>
-			</tr>
-			<tr>
-				<td colspan="3">
-					<h3>Level message</h3>
-					<textarea id="script" onblur="saveFields(event)"></textarea>
-						
+		<div id="properties">
+			<h1>Properties</h1>
+	        
+	        <table>
+	            <tr>
+	                <td>Tao</td>
+	                <td>
+	                    Yin<br>
+	                    <input type="number" id="yin" onchange="save(event)" value="1" min="-10" max="0"><br>
+	                    Yang<br>
+	                    <input type="number" id="yang" onchange="save(event)" value="1" min="0" max="10"><br>
+	                </td>
+	            </tr>
+	            <tr>
+	                <td>Teleport</td>
+	                <td>
+	                    Level:<br>
+	                    <input type="text" onblur="save(event)" placeholder="Level id" id="teleport_level"><br>
+	                    X:<br>
+	                    <input type="number" onblur="save(event)" id="teleport_x"><br>
+	                    Y:<br>
+	                    <input type="number" onblur="save(event)" id="teleport_y"><br>
+	                </td>
+	            </tr>
+	            <tr>
+	                <td>Script</td>
+	                <td>
+	                    <textarea onblur="save(event)" id="script">
+	                        
+	                    </textarea>
+	                    
+	                </td>
+	            </tr>
+	        </table>
+		</div>
+		<div id="canvas">
+			<canvas></canvas>
+		</div>
+		<div id="scriptWindow">
+			<textarea style="width: 360pt; height:800pt"  id="script" onblur="save(event)"></textarea>
 				
-					
-				</td>
-			</tr>
-		</table>
+		</div>
+		<div id="toolbar" style="position: relative; background-image: url('img/tileset.png')">
+			<div id="selection"></div>
+		</div>
+
 		
 		<script src="js/bundle.js"></script>
 	</body>

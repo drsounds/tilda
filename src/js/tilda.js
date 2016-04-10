@@ -91,6 +91,14 @@ export class Tilda {
 	
 	getObject(obj) {
 		
+	} 
+	
+	lock() {
+		this.status.locked = true;
+	}
+	
+	unlock() {
+		this.status.locked = false;
 	}
 	
 	next() {
@@ -144,7 +152,7 @@ export class Tilda {
 		this.gameHeight = 192;
 		renderer.canvas.width = this.gameWidth;
 		renderer.canvas.height = this.gameHeight;
-		
+	
 		
 		this.renderer = renderer;
 		this.zoom = {
@@ -173,6 +181,7 @@ export class Tilda {
 		this.activeBlock = null;
 		this.status = {
 			yin: 0,
+			locked: false,
 			yang: 0,
 			points: 0,
 			exp: 0,
@@ -200,7 +209,7 @@ export class Tilda {
 		};
 		xmlHttp.open('GET', '/t.tileset', true);
 		xmlHttp.send(null);
-		window.addEventListener('mousedown', (event) => {
+		this.renderer.canvas.addEventListener('mousedown', (event) => {
 			if (this.mode != MODE_EDITING) {
 				return;
 			}
@@ -221,13 +230,13 @@ export class Tilda {
 					case TOOL_POINTER:
 						this.editor.selectedX = pos.x;
 						this.editor.selectedY = pos.y;
-						this.propertiesWindow.contentWindow.postMessage(
+						this.editor.selectedBlock = this.level.blocks[this.editor.selectedX][this.editor.selectedY];
+						var evt = new CustomEvent('selectedblock');
+						evt.data =
 							{
-								block: this.level.blocks[this.editor.selectedX][this.editor.selectedY]
-								
-							},
-							'*'
-						)
+								block: this.editor.selectedBlock
+							};
+						this.dispatchEvent(evt);
 						break;
 				}
 				this.level.save();
@@ -239,20 +248,26 @@ export class Tilda {
 				this.level.save();
 			}
 		});
-		window.addEventListener('message', (event) => {
-			this.editor.tool = event.data.tool;
-				if ('blockType' in event.data) {
-					if (event.data.blockType != null) {
-						this.activeTool = TOOL_DRAW;
-						this.editor.activeBlockType = event.data.blockType;
-					} else {
-						this.activeTool = TOOL_POINTER;
-					}
-				} 	
-				if ('block' in event.data) {
-					this.level.blocks[event.data.block.x][event.data.block.y] = event.data.block;
-				}
-		})
+		
+		
+		
+	}
+	
+	setBlock(block) {
+		this.level.blocks[block.x][block.y] = block;
+	}
+	
+	setBlockType(blockType) {
+		if (blockType != null) {
+			this.activeTool = TOOL_DRAW;
+			this.editor.activeBlockType = event.data.blockType;
+		} else {
+			this.activeTool = TOOL_POINTER;
+		}
+	} 	
+	
+	setTool(tool) {
+		this.activeTool = tool;
 	}
 	
 	getBlockType(blockType) {
@@ -315,14 +330,28 @@ export class Tilda {
 			level: level
 		};
 		if ('script' in level) {
-			var func = new Function(level.script);
-			func.call(this);
+			try {
+				var func = new Function(level.script);
+				func.call(this);
+			} catch (e) {
+				
+			}
 		}
 		this.dispatchEvent(evt);
 	}
 	
-	message(message) {
+	message(message, cb) {
 		this.text = message;
+		if (cb) {
+			this.lock();
+			window.addEventListener('keydown', (event) => {
+				if (event.code == 'KeyA') {
+					this.text = '';
+					this.unlock();
+					cb.call(this);
+				}
+			});
+		}
 	}
 	
 	tick() {
@@ -387,9 +416,12 @@ export class Tilda {
 
 					if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
 						if (block.script.length > 0) {
+							try {
 							var func = new Function(block.script);
 							func.apply(this);
-						
+							}catch(e) {
+								
+							}
 						}
 						if (block.teleport) {
 							if (block.teleport.level) {
@@ -566,10 +598,8 @@ class CharacterEntity extends Entity {
 	constructor(game, level) {
 		super(game, level);
 		this.level = level;
-		this.x = this.level.player.x;
 		this.tileX = 2;
 		this.tileY = 1;
-		this.y = this.level.player.y;
 	
 	}
 	
@@ -610,6 +640,11 @@ class CharacterEntity extends Entity {
 		this.turnDown();
 	}
 	
+	stop() {
+		this.moveX = 0;
+		this.moveY = 0;
+	}
+	
 	jump() {
 		this.moveZ = 1;
 	}
@@ -625,8 +660,13 @@ class PlayerEntity extends CharacterEntity {
 	
 	constructor(game, level) {
 		super(game, level);
+		this.x = this.level.player.x;
+		this.y = this.level.player.y;
 		
 		window.onkeydown = (event) => {
+			if (this.game.status.locked) {
+				return;
+			}
 			if (this.game.isJumpingOver) {
 				return;
 			}
@@ -646,8 +686,13 @@ class PlayerEntity extends CharacterEntity {
 			if (event.code == 'KeyA') {
 				if (this.game.activeBlock) {
 					if (this.game.activeBlock.script.length > 0) {
-						var func = new Function(this.game.activeBlock.script);
-						func.apply(this.game);
+						try {
+							var func = new Function(this.game.activeBlock.script);
+							func.apply(this.game);
+						} catch (e) {
+							
+						}
+							
 					}
 					
 					this.game.text = '';
@@ -744,6 +789,10 @@ class Level {
 		xmlHttp.open("PUT", "/api/levels/" + this.id + '', true);
 		xmlHttp.setRequestHeader("Content-Type", "application/json");
 		xmlHttp.send(json_upload);
+	}
+	addEntity(type) {
+		var t = new type(this.game, this);
+		return t;
 	}
 	constructor(game, level) {
 		this.game = game;

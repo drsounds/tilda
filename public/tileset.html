@@ -13,13 +13,6 @@
 		      background-image: url('img/tileset.png');
                  
              }
-		      #selection {
-		          left: 0px;
-		          top: 0px;
-		          position: absolute;
-		          
-		          border: 1px solid blue;
-		      }
         </style>
         <script>
        
@@ -53,39 +46,7 @@
         };
         xmlHttp.open('GET', '/t.tileset', true);
         xmlHttp.send(null);  
-        window.addEventListener('mousedown', function (event) {
-            var x = event.pageX;
-            var y = event.pageY;
-            var TILE_SIZE = 16;
-            var tileX = Math.floor((x + 1) / TILE_SIZE);
-            var tileY = Math.floor((y + 1) / TILE_SIZE);
-            var selection = document.querySelector('#selection');
-            selection.style.width = TILE_SIZE + 'px';
-            selection.style.height = TILE_SIZE + 'px';
-            selection.style.left = (tileX * TILE_SIZE) + 'px';
-            selection.style.top = (tileY * TILE_SIZE) + 'px';
-            var type = null;
-            var tool = 0;
-            if (tileX == 0 && tileY == 0) {
-                tool = 0;
-            } else {
-                tool = 1;
-            }
-            for(var t in tiles) {
-                var tile = tiles[t];
-                if (tile.tileX == tileX && tile.tileY == tileY) {
-                    console.log(tile);
-                   type = tile.id;
-                }
-            }
-            console.log(type);
-            window.parent.postMessage({
-                action: 'put',
-                blockType: type,
-                tool: tool,
-                layer: 0
-            }, '*');
-        });
+       
         </script>
     </head>
     <body>

@@ -17,7 +17,28 @@ window.addEventListener('load', function () {
 	if (path.length > 1) {
 		level = path[1];
 	}
+	var dockManager = new dockspawn.DockManager(document.querySelector("body"));
+	dockManager.initialize();
 
+	var canvas = new dockspawn.PanelContainer(document.querySelector("#canvas"), dockManager);
+	var scriptEditor = new dockspawn.PanelContainer(document.querySelector("#scriptWindow"), dockManager);
+	var propertiesEditor = new dockspawn.PanelContainer(document.querySelector("#properties"), dockManager);
+	var toolbox = new dockspawn.PanelContainer(document.querySelector("#toolbar"), dockManager);
+
+	var documentNode = dockManager.context.model.documentManagerNode;
+
+	dockManager.dockRight(documentNode, propertiesEditor, 0.2);
+	dockManager.dockFill(documentNode, canvas);
+	dockManager.dockLeft(documentNode, toolbox, 0.2);
+	dockManager.dockDown(documentNode, scriptEditor, 0.2);
+
+	window.onresize = function (event) {
+		dockManager.resize(window.innerWidth, window.innerHeight);
+	};
+	window.onresize();
+	//var editor = ace.edit('script');
+	//editor.getSession().setMode('ace/mode/javascript');
+	//editor.setTheme('ace/theme/monokai');
 	game.loadLevel(level).then(function (level) {
 		game.start();
 		var iframe = document.createElement('iframe');
@@ -25,7 +46,66 @@ window.addEventListener('load', function () {
 		game.propertiesWindow = document.querySelector('iframe#properties');
 		$('#script').val(game.level.script);
 	});
-	window.saveFields = function () {
+	document.querySelector('#toolbar').addEventListener('mousedown', function (event) {
+		var x = event.pageX;
+		var y = event.pageY;
+		var TILE_SIZE = 16;
+		var tileX = Math.floor((x + 1) / TILE_SIZE);
+		var tileY = Math.floor((y + 1) / TILE_SIZE);
+		var selection = document.querySelector('#selection');
+		selection.style.width = TILE_SIZE + 'px';
+		selection.style.height = TILE_SIZE + 'px';
+		selection.style.left = tileX * TILE_SIZE + 'px';
+		selection.style.top = tileY * TILE_SIZE + 'px';
+		var type = null;
+		var tool = 0;
+		for (var i in game.blockTypes) {
+			var blockType = game.blockTypes[i];
+			if (tileX == blockType.tileX && tileY == blockType.tileY) {
+				type = blockType.id;
+			}
+		}
+
+		if (tileX == 0 && tileY == 0) {
+			tool = 0;
+		} else {
+			tool = 1;
+		}
+
+		console.log(type);
+		game.editor.activeBlockType = type;
+		game.editor.tool = tool;
+	});
+
+	game.addEventListener('selectedblock', function (event) {
+		var block = event.data.block;
+		if (!block.teleport) {
+			block.teleport = {
+				x: 0,
+				y: 0,
+				level: null
+			};
+		}
+		$('#teleport_x').val(block.teleport.x);
+		$('#teleport_y').val(block.teleport.y);
+		$('#yin').val(block.yin);
+		$('#yang').val(block.yang);
+		$('#teleport_level').val(block.teleport.level);
+		$('#object_script').val(block.script);
+	});
+	window.save = function () {
+		try {
+			var block = game.editor.selectedBlock;
+			block.script = $('#script').val();
+			block.yin = parseInt($('#yin').val());
+			block.yang = parseInt($('#yang').val());
+			block.teleport = {
+				x: $('#teleport_x').val(),
+				y: $('#teleport_y').val(),
+				level: $('#teleport_level').val()
+			};
+			game.setBlock(block);
+		} catch (e) {}
 		game.level.script = $('#script').val();
 		game.level.save();
 	};
@@ -166,6 +246,16 @@ var Tilda = function () {
 		key: 'getObject',
 		value: function getObject(obj) {}
 	}, {
+		key: 'lock',
+		value: function lock() {
+			this.status.locked = true;
+		}
+	}, {
+		key: 'unlock',
+		value: function unlock() {
+			this.status.locked = false;
+		}
+	}, {
 		key: 'next',
 		value: function next() {
 			if (this.sequence.length < 1) {
@@ -254,6 +344,7 @@ var Tilda = function () {
 		this.activeBlock = null;
 		this.status = {
 			yin: 0,
+			locked: false,
 			yang: 0,
 			points: 0,
 			exp: 0,
@@ -277,7 +368,7 @@ var Tilda = function () {
 		};
 		xmlHttp.open('GET', '/t.tileset', true);
 		xmlHttp.send(null);
-		window.addEventListener('mousedown', function (event) {
+		this.renderer.canvas.addEventListener('mousedown', function (event) {
 			if (_this2.mode != MODE_EDITING) {
 				return;
 			}
@@ -296,10 +387,12 @@ var Tilda = function () {
 					case TOOL_POINTER:
 						_this2.editor.selectedX = pos.x;
 						_this2.editor.selectedY = pos.y;
-						_this2.propertiesWindow.contentWindow.postMessage({
-							block: _this2.level.blocks[_this2.editor.selectedX][_this2.editor.selectedY]
-
-						}, '*');
+						_this2.editor.selectedBlock = _this2.level.blocks[_this2.editor.selectedX][_this2.editor.selectedY];
+						var evt = new CustomEvent('selectedblock');
+						evt.data = {
+							block: _this2.editor.selectedBlock
+						};
+						_this2.dispatchEvent(evt);
 						break;
 				}
 				_this2.level.save();
@@ -310,23 +403,29 @@ var Tilda = function () {
 				_this2.level.save();
 			}
 		});
-		window.addEventListener('message', function (event) {
-			_this2.editor.tool = event.data.tool;
-			if ('blockType' in event.data) {
-				if (event.data.blockType != null) {
-					_this2.activeTool = TOOL_DRAW;
-					_this2.editor.activeBlockType = event.data.blockType;
-				} else {
-					_this2.activeTool = TOOL_POINTER;
-				}
-			}
-			if ('block' in event.data) {
-				_this2.level.blocks[event.data.block.x][event.data.block.y] = event.data.block;
-			}
-		});
 	}
 
 	_createClass(Tilda, [{
+		key: 'setBlock',
+		value: function setBlock(block) {
+			this.level.blocks[block.x][block.y] = block;
+		}
+	}, {
+		key: 'setBlockType',
+		value: function setBlockType(blockType) {
+			if (blockType != null) {
+				this.activeTool = TOOL_DRAW;
+				this.editor.activeBlockType = event.data.blockType;
+			} else {
+				this.activeTool = TOOL_POINTER;
+			}
+		}
+	}, {
+		key: 'setTool',
+		value: function setTool(tool) {
+			this.activeTool = tool;
+		}
+	}, {
 		key: 'getBlockType',
 		value: function getBlockType(blockType) {
 			for (var b in this.blockTypes) {
@@ -395,15 +494,29 @@ var Tilda = function () {
 				level: level
 			};
 			if ('script' in level) {
-				var func = new Function(level.script);
-				func.call(this);
+				try {
+					var func = new Function(level.script);
+					func.call(this);
+				} catch (e) {}
 			}
 			this.dispatchEvent(evt);
 		}
 	}, {
 		key: 'message',
-		value: function message(_message) {
+		value: function message(_message, cb) {
+			var _this4 = this;
+
 			this.text = _message;
+			if (cb) {
+				this.lock();
+				window.addEventListener('keydown', function (event) {
+					if (event.code == 'KeyA') {
+						_this4.text = '';
+						_this4.unlock();
+						cb.call(_this4);
+					}
+				});
+			}
 		}
 	}, {
 		key: 'tick',
@@ -468,8 +581,10 @@ var Tilda = function () {
 
 						if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
 							if (block.script.length > 0) {
-								var func = new Function(block.script);
-								func.apply(this);
+								try {
+									var func = new Function(block.script);
+									func.apply(this);
+								} catch (e) {}
 							}
 							if (block.teleport) {
 								if (block.teleport.level) {
@@ -496,7 +611,7 @@ var Tilda = function () {
 	}, {
 		key: 'render',
 		value: function render() {
-			var _this4 = this;
+			var _this5 = this;
 
 			this.renderer.clear();
 			if (this.level) {
@@ -567,7 +682,7 @@ var Tilda = function () {
 				this.renderer.context.fillStyle = 'white';
 				wrapText(this.renderer.context, this.text, 22, 32, 180, 9);
 				setTimeout(function () {
-					_this4.text = '';
+					_this5.text = '';
 				}, 1000);
 			}
 		}
@@ -653,15 +768,13 @@ var CharacterEntity = function (_Entity) {
 	function CharacterEntity(game, level) {
 		_classCallCheck(this, CharacterEntity);
 
-		var _this5 = _possibleConstructorReturn(this, Object.getPrototypeOf(CharacterEntity).call(this, game, level));
+		var _this6 = _possibleConstructorReturn(this, Object.getPrototypeOf(CharacterEntity).call(this, game, level));
 
-		_this5.level = level;
-		_this5.x = _this5.level.player.x;
-		_this5.tileX = 2;
-		_this5.tileY = 1;
-		_this5.y = _this5.level.player.y;
+		_this6.level = level;
+		_this6.tileX = 2;
+		_this6.tileY = 1;
 
-		return _this5;
+		return _this6;
 	}
 
 	_createClass(CharacterEntity, [{
@@ -713,6 +826,12 @@ var CharacterEntity = function (_Entity) {
 			this.turnDown();
 		}
 	}, {
+		key: 'stop',
+		value: function stop() {
+			this.moveX = 0;
+			this.moveY = 0;
+		}
+	}, {
 		key: 'jump',
 		value: function jump() {
 			this.moveZ = 1;
@@ -731,60 +850,68 @@ var PlayerEntity = function (_CharacterEntity) {
 	function PlayerEntity(game, level) {
 		_classCallCheck(this, PlayerEntity);
 
-		var _this6 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
+		var _this7 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
+
+		_this7.x = _this7.level.player.x;
+		_this7.y = _this7.level.player.y;
 
 		window.onkeydown = function (event) {
-			if (_this6.game.isJumpingOver) {
+			if (_this7.game.status.locked) {
+				return;
+			}
+			if (_this7.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				_this6.walkUp();
+				_this7.walkUp();
 			}
 			if (event.code == 'ArrowDown') {
-				_this6.walkDown();
+				_this7.walkDown();
 			}
 			if (event.code == 'ArrowLeft') {
-				_this6.walkLeft();
+				_this7.walkLeft();
 			}
 			if (event.code == 'ArrowRight') {
-				_this6.walkRight();
+				_this7.walkRight();
 			}
 			if (event.code == 'KeyA') {
-				if (_this6.game.activeBlock) {
-					if (_this6.game.activeBlock.script.length > 0) {
-						var func = new Function(_this6.game.activeBlock.script);
-						func.apply(_this6.game);
+				if (_this7.game.activeBlock) {
+					if (_this7.game.activeBlock.script.length > 0) {
+						try {
+							var func = new Function(_this7.game.activeBlock.script);
+							func.apply(_this7.game);
+						} catch (e) {}
 					}
 
-					_this6.game.text = '';
-					_this6.game.activeBlock = null;
+					_this7.game.text = '';
+					_this7.game.activeBlock = null;
 					return;
 				}
-				_this6.jump();
+				_this7.jump();
 			}
 		};
 		window.onkeyup = function (event) {
-			if (_this6.game.isJumpingOver) {
+			if (_this7.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				_this6.moveY = -0;
+				_this7.moveY = -0;
 			}
 			if (event.code == 'ArrowDown') {
-				_this6.moveY = 0;
+				_this7.moveY = 0;
 			}
 			if (event.code == 'ArrowLeft') {
-				_this6.moveX = -0;
+				_this7.moveX = -0;
 			}
 			if (event.code == 'ArrowRight') {
-				_this6.moveX = 0;
+				_this7.moveX = 0;
 			}
 			if (event.code == 'KeyA') {
-				_this6.moveZ = 0;
+				_this7.moveZ = 0;
 			}
 		};
 
-		return _this6;
+		return _this7;
 	}
 
 	return PlayerEntity;
@@ -854,6 +981,12 @@ var Level = function () {
 			xmlHttp.open("PUT", "/api/levels/" + this.id + '', true);
 			xmlHttp.setRequestHeader("Content-Type", "application/json");
 			xmlHttp.send(json_upload);
+		}
+	}, {
+		key: 'addEntity',
+		value: function addEntity(type) {
+			var t = new type(this.game, this);
+			return t;
 		}
 	}]);
 
