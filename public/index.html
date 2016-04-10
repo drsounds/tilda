@@ -27,6 +27,7 @@
 				display: inline-block;
 				float: left;
 		    height:100%;
+		    width:100%;
 		    touch-action: none;
 		  }
 		  iframe {
@@ -75,7 +76,7 @@
 	            <tr>
 	                <td>Script</td>
 	                <td>
-	                    <textarea onblur="save(event)" id="script">
+	                    <textarea onblur="save(event)" id="object_script">
 	                        
 	                    </textarea>
 	                    
@@ -90,7 +91,7 @@
 			<textarea style="width: 360pt; height:800pt"  id="script" onblur="save(event)"></textarea>
 				
 		</div>
-		<div id="toolbar" style="position: relative; background-image: url('img/tileset.png')">
+		<div id="toolbar" style="position: relative; background-repeat: no-repeat; background-image: url('img/tileset.png')">
 			<div id="selection"></div>
 		</div>
 

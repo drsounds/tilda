@@ -86,7 +86,11 @@ export class Tilda {
 	}
 	
 	seq() {
-		this.sequence = arguments;
+		this.sequence = arguments[0];
+		if (!this.sequence) {
+			debugger;
+		}
+		this.next();
 	}
 	
 	getObject(obj) {
@@ -102,11 +106,15 @@ export class Tilda {
 	}
 	
 	next() {
+		
+		this.text = '';
+		if (this.sequence == null) {
+			return;
+		}
 		if (this.sequence.length < 1) {
 			return;
 		}
-		var nextOperation = this.sequence[0];
-		this.sequence.slice(1);
+		var nextOperation = this.sequence.pop();
 		
 		nextOperation.call(this);
 	}
@@ -116,12 +124,13 @@ export class Tilda {
 		var height = this.renderer.canvas.height;
 		var pageWidth = this.renderer.canvas.getBoundingClientRect().width;
 		var pageHeight = this.renderer.canvas.getBoundingClientRect().height;
+		var bounds = this.renderer.canvas.getBoundingClientRect();
 		
 		var cx = width;
 		var cy = height;
 		
-		var x = ((event.pageX - this.renderer.canvas.getBoundingClientRect().left) / pageWidth) * cx;
-		var y = (event.pageY / pageHeight) * cy ;
+		var x = ((event.pageX - bounds.left) / pageWidth) * cx;
+		var y = ((event.pageY - bounds.top) / pageHeight) * cy ;
 		
 		var selectedX = Math.floor((x + 1) / TILE_SIZE);
 	 	var selectedY = Math.floor((y + 1) / TILE_SIZE) ;
@@ -171,6 +180,7 @@ export class Tilda {
 		this.activeTile = {
 			x: 1, y: 2
 		};
+		this.keysPressed = [];
 		this.cameraY = 0;
 		this.activeTool = 0;
 		this.isJumpingOver = false;
@@ -179,6 +189,7 @@ export class Tilda {
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
 		this.activeBlock = null;
+		this.aKeyPressed = false;
 		this.status = {
 			yin: 0,
 			locked: false,
@@ -214,23 +225,23 @@ export class Tilda {
 				return;
 			}
 			var pos = this.getPostionFromCursor();
-
+		
 			if (event.which == 1) {
 				
 			
 			
 				switch(this.editor.tool) {
 					case TOOL_DRAW:
-						this.level.setBlock(pos.x, pos.y, {
-							x: pos.x,
-							y: pos.y,
+						this.level.setBlock(pos.x + this.cameraX / TILE_SIZE, pos.y + this.cameraY / TILE_SIZE, {
+							x: pos.x + this.cameraX / TILE_SIZE,
+							y: pos.y + this.cameraY / TILE_SIZE,
 							type: this.editor.activeBlockType
 						});
 						break;
 					case TOOL_POINTER:
 						this.editor.selectedX = pos.x;
 						this.editor.selectedY = pos.y;
-						this.editor.selectedBlock = this.level.blocks[this.editor.selectedX][this.editor.selectedY];
+						this.editor.selectedBlock = this.level.blocks[this.editor.selectedX + this.cameraX / TILE_SIZE][this.editor.selectedY + this.cameraY / TILE_SIZE];
 						var evt = new CustomEvent('selectedblock');
 						evt.data =
 							{
@@ -334,7 +345,7 @@ export class Tilda {
 				var func = new Function(level.script);
 				func.call(this);
 			} catch (e) {
-				
+				console.log(e.stack);
 			}
 		}
 		this.dispatchEvent(evt);
@@ -342,16 +353,6 @@ export class Tilda {
 	
 	message(message, cb) {
 		this.text = message;
-		if (cb) {
-			this.lock();
-			window.addEventListener('keydown', (event) => {
-				if (event.code == 'KeyA') {
-					this.text = '';
-					this.unlock();
-					cb.call(this);
-				}
-			});
-		}
 	}
 	
 	tick() {
@@ -379,27 +380,27 @@ export class Tilda {
 					var is_solid = (blockType.flags & TILE_SOLID) == TILE_SOLID;
 					var obj = this.level.objects[i];
 					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE * 0.8 && obj.y < top + TILE_SIZE / 2 - 1 && obj.moveX > 0 && is_solid) {
-						if ((blockType.flags & TILE_FLAG_JUMP_LEFT) == TILE_FLAG_JUMP_LEFT) {
+						if ((blockType.flags & TILE_FLAG_JUMP_RIGHT) == TILE_FLAG_JUMP_RIGHT) {
 							this.isJumpingOver = true;
-							obj.moveX = -4;
-							obj.moveZ = 5;
+							obj.moveX = .6;
+							obj.moveZ = 3;
 						} else {
 							obj.moveX = 0;
 						}
 					}
 					
-					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 1 && obj.x < left + TILE_SIZE * 0.9 && obj.x > left - TILE_SIZE * 0.8 && obj.moveX < 0 && is_solid) {
-					
-						if ((blockType.flags & TILE_FLAG_JUMP_RIGHT)  == TILE_FLAG_JUMP_RIGHT) {
+					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 1 && obj.x < left + TILE_SIZE && obj.x > left - TILE_SIZE && obj.moveX < 0 && is_solid) {
+						
+						if ((blockType.flags & TILE_FLAG_JUMP_LEFT)  == TILE_FLAG_JUMP_LEFT) {
 							this.isJumpingOver = true;
 							obj.moveX = 3;
 							obj.moveZ = 3;
-						} 
-						obj.moveX = 0;
-						
+						}  else {
+							obj.moveX = 0;
+						}
 					}
 
-					if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.moveY > 0 && is_solid) {
+					if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 2 && obj.moveY > 0 && is_solid) {
 						if (block.teleport) {
 							if (block.teleport.level) {
 								this.loadLevel(block.teleport.level);
@@ -414,29 +415,33 @@ export class Tilda {
 						}
 					}
 
-					if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
-						if (block.script.length > 0) {
+					if (obj.x > left - TILE_SIZE  && obj.x < left + TILE_SIZE -1 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE && is_solid) {
+						if (block.script && block.script.length > 0 && this.aKeyPressed) { // #QINOTE #AQUAJOGGING@R@CT
 							try {
-							var func = new Function(block.script);
-							func.apply(this);
+								var func = new Function(block.script);
+								func.apply(this);
 							}catch(e) {
-								
+								console.log(e.stack);
 							}
 						}
-						if (block.teleport) {
-							if (block.teleport.level) {
-								this.loadLevel(block.teleport.level);
+						
+						if (obj.moveY < 0) {
+							
+							if (block.teleport) {
+								if (block.teleport.level) {
+									this.loadLevel(block.teleport.level);
+								}
 							}
+							if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
+								this.isJumpingOver = true;
+								obj.moveY = -0.6;
+								obj.moveZ = 1;
+							} else {
+								obj.moveY = -0;
+							}
+							this.activeBlock = block;
+							collidied = true;
 						}
-						if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
-							this.isJumpingOver = true;
-							obj.moveY = -0.6;
-							obj.moveZ = 1;
-						} else {
-							obj.moveY = 0;
-						}
-						this.activeBlock = block;
-						collidied = true;
 					}
 					if (!collidied) {
 						this.activeBlock = null;
@@ -518,9 +523,7 @@ export class Tilda {
 			this.renderer.context.fillRect(10, 22, 180, 60);
 			this.renderer.context.fillStyle = 'white';
 			wrapText(this.renderer.context, this.text, 22, 32, 180, 9);
-			setTimeout( () => {
-				this.text = '';
-			}, 1000);
+	
 		}
 	}
 }
@@ -663,7 +666,10 @@ class PlayerEntity extends CharacterEntity {
 		this.x = this.level.player.x;
 		this.y = this.level.player.y;
 		
+		
 		window.onkeydown = (event) => {
+			
+			this.game.keysPressed.push(event.code);
 			if (this.game.status.locked) {
 				return;
 			}
@@ -684,13 +690,16 @@ class PlayerEntity extends CharacterEntity {
 				this.walkRight();
 			}
 			if (event.code == 'KeyA') {
+				this.game.aKeyPressed = true;
+				console.log(this.aKeyPressed);
+				this.game.next();
 				if (this.game.activeBlock) {
 					if (this.game.activeBlock.script.length > 0) {
 						try {
 							var func = new Function(this.game.activeBlock.script);
 							func.apply(this.game);
 						} catch (e) {
-							
+							console.log(e.stack);
 						}
 							
 					}
@@ -703,6 +712,8 @@ class PlayerEntity extends CharacterEntity {
 			}
 		}
 		window.onkeyup = (event) => {
+	
+			this.game.keysPressed = array_remove(this.game.keysPressed, event.code);
 			if (this.game.isJumpingOver) {
 				return;
 			}
@@ -719,6 +730,7 @@ class PlayerEntity extends CharacterEntity {
 				this.moveX = 0;
 			}
 			if (event.code == 'KeyA') {
+				this.game.aKeyPressed = false;
 				this.moveZ = 0;
 			}
 		}
@@ -726,6 +738,18 @@ class PlayerEntity extends CharacterEntity {
 	}
 	
 }
+
+// http://stackoverflow.com/questions/9792927/javascript-array-search-and-remove-string
+function array_remove (array,elem, all) {
+  for (var i=array.length-1; i>=0; i--) {
+    if (array[i] === elem) {
+        array.splice(i, 1);
+        if(!all)
+          break;
+    }
+  }
+  return array;
+};
 
 
 class Block {
@@ -767,7 +791,7 @@ class Level {
 		for (var x in this.blocks) {
 			for (var y in this.blocks[x]) {
 				var block = this.blocks[x][y];
-				if (!block) {
+				if (!block && block == null) {
 					return;
 				}
 				jsonData.blocks.push(block);
@@ -782,7 +806,6 @@ class Level {
 					var json = JSON.parse(xmlHttp.responseText);
 					
 				} else {
-					debugger;
 				}
 			}
 		}
@@ -790,8 +813,10 @@ class Level {
 		xmlHttp.setRequestHeader("Content-Type", "application/json");
 		xmlHttp.send(json_upload);
 	}
-	addEntity(type) {
+	addEntity(type, x ,y) {
 		var t = new type(this.game, this);
+		t.x = x * TILE_SIZE;
+		t.y = y * TILE_SIZE;
 		return t;
 	}
 	constructor(game, level) {
@@ -799,11 +824,13 @@ class Level {
 		this.name = level.name;
 		this.entities = {};
 		this.blocks = {};
+		this.player = level.player;
 		this.flags = level.flags;
 		this.script = level.script;
 		this.objects = [];
 		for (var i in level.blocks) {
 			var block = level.blocks[i];
+			if (block != null)
 			this.setBlock(block.x, block.y, block);
 		}
 		this.player = new PlayerEntity(game, level);

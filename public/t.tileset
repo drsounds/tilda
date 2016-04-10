@@ -17,3 +17,8 @@ x y flags
 bungalow_hair 0 6 1
 bungalow_wall 0 7 1
 bungalow_door 1 7 1
+stig 0 3 0
+grass 0 5 0
+water 0 2 0
+sand 0 8 0
+sign 1 8 1

@@ -48,7 +48,7 @@ window.addEventListener('load', function () {
 	});
 	document.querySelector('#toolbar').addEventListener('mousedown', function (event) {
 		var x = event.pageX;
-		var y = event.pageY;
+		var y = event.pageY - $('#toolbar').offset().top;
 		var TILE_SIZE = 16;
 		var tileX = Math.floor((x + 1) / TILE_SIZE);
 		var tileY = Math.floor((y + 1) / TILE_SIZE);
@@ -79,6 +79,9 @@ window.addEventListener('load', function () {
 
 	game.addEventListener('selectedblock', function (event) {
 		var block = event.data.block;
+		if (!block) {
+			return;
+		}
 		if (!block.teleport) {
 			block.teleport = {
 				x: 0,
@@ -96,7 +99,7 @@ window.addEventListener('load', function () {
 	window.save = function () {
 		try {
 			var block = game.editor.selectedBlock;
-			block.script = $('#script').val();
+			block.script = $('#object_script').val();
 			block.yin = parseInt($('#yin').val());
 			block.yang = parseInt($('#yang').val());
 			block.teleport = {
@@ -240,7 +243,11 @@ var Tilda = function () {
 	}, {
 		key: 'seq',
 		value: function seq() {
-			this.sequence = arguments;
+			this.sequence = arguments[0];
+			if (!this.sequence) {
+				debugger;
+			}
+			this.next();
 		}
 	}, {
 		key: 'getObject',
@@ -258,11 +265,15 @@ var Tilda = function () {
 	}, {
 		key: 'next',
 		value: function next() {
+
+			this.text = '';
+			if (this.sequence == null) {
+				return;
+			}
 			if (this.sequence.length < 1) {
 				return;
 			}
-			var nextOperation = this.sequence[0];
-			this.sequence.slice(1);
+			var nextOperation = this.sequence.pop();
 
 			nextOperation.call(this);
 		}
@@ -273,12 +284,13 @@ var Tilda = function () {
 			var height = this.renderer.canvas.height;
 			var pageWidth = this.renderer.canvas.getBoundingClientRect().width;
 			var pageHeight = this.renderer.canvas.getBoundingClientRect().height;
+			var bounds = this.renderer.canvas.getBoundingClientRect();
 
 			var cx = width;
 			var cy = height;
 
-			var x = (event.pageX - this.renderer.canvas.getBoundingClientRect().left) / pageWidth * cx;
-			var y = event.pageY / pageHeight * cy;
+			var x = (event.pageX - bounds.left) / pageWidth * cx;
+			var y = (event.pageY - bounds.top) / pageHeight * cy;
 
 			var selectedX = Math.floor((x + 1) / TILE_SIZE);
 			var selectedY = Math.floor((y + 1) / TILE_SIZE);
@@ -334,6 +346,7 @@ var Tilda = function () {
 		this.activeTile = {
 			x: 1, y: 2
 		};
+		this.keysPressed = [];
 		this.cameraY = 0;
 		this.activeTool = 0;
 		this.isJumpingOver = false;
@@ -342,6 +355,7 @@ var Tilda = function () {
 		this.loadTiles(TILESET);
 		this.state = GAME_READY;
 		this.activeBlock = null;
+		this.aKeyPressed = false;
 		this.status = {
 			yin: 0,
 			locked: false,
@@ -378,16 +392,16 @@ var Tilda = function () {
 
 				switch (_this2.editor.tool) {
 					case TOOL_DRAW:
-						_this2.level.setBlock(pos.x, pos.y, {
-							x: pos.x,
-							y: pos.y,
+						_this2.level.setBlock(pos.x + _this2.cameraX / TILE_SIZE, pos.y + _this2.cameraY / TILE_SIZE, {
+							x: pos.x + _this2.cameraX / TILE_SIZE,
+							y: pos.y + _this2.cameraY / TILE_SIZE,
 							type: _this2.editor.activeBlockType
 						});
 						break;
 					case TOOL_POINTER:
 						_this2.editor.selectedX = pos.x;
 						_this2.editor.selectedY = pos.y;
-						_this2.editor.selectedBlock = _this2.level.blocks[_this2.editor.selectedX][_this2.editor.selectedY];
+						_this2.editor.selectedBlock = _this2.level.blocks[_this2.editor.selectedX + _this2.cameraX / TILE_SIZE][_this2.editor.selectedY + _this2.cameraY / TILE_SIZE];
 						var evt = new CustomEvent('selectedblock');
 						evt.data = {
 							block: _this2.editor.selectedBlock
@@ -497,26 +511,16 @@ var Tilda = function () {
 				try {
 					var func = new Function(level.script);
 					func.call(this);
-				} catch (e) {}
+				} catch (e) {
+					console.log(e.stack);
+				}
 			}
 			this.dispatchEvent(evt);
 		}
 	}, {
 		key: 'message',
 		value: function message(_message, cb) {
-			var _this4 = this;
-
 			this.text = _message;
-			if (cb) {
-				this.lock();
-				window.addEventListener('keydown', function (event) {
-					if (event.code == 'KeyA') {
-						_this4.text = '';
-						_this4.unlock();
-						cb.call(_this4);
-					}
-				});
-			}
 		}
 	}, {
 		key: 'tick',
@@ -545,26 +549,27 @@ var Tilda = function () {
 						var is_solid = (blockType.flags & TILE_SOLID) == TILE_SOLID;
 						var obj = this.level.objects[i];
 						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE * 0.8 && obj.y < top + TILE_SIZE / 2 - 1 && obj.moveX > 0 && is_solid) {
-							if ((blockType.flags & TILE_FLAG_JUMP_LEFT) == TILE_FLAG_JUMP_LEFT) {
+							if ((blockType.flags & TILE_FLAG_JUMP_RIGHT) == TILE_FLAG_JUMP_RIGHT) {
 								this.isJumpingOver = true;
-								obj.moveX = -4;
-								obj.moveZ = 5;
+								obj.moveX = .6;
+								obj.moveZ = 3;
 							} else {
 								obj.moveX = 0;
 							}
 						}
 
-						if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 1 && obj.x < left + TILE_SIZE * 0.9 && obj.x > left - TILE_SIZE * 0.8 && obj.moveX < 0 && is_solid) {
+						if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 1 && obj.x < left + TILE_SIZE && obj.x > left - TILE_SIZE && obj.moveX < 0 && is_solid) {
 
-							if ((blockType.flags & TILE_FLAG_JUMP_RIGHT) == TILE_FLAG_JUMP_RIGHT) {
+							if ((blockType.flags & TILE_FLAG_JUMP_LEFT) == TILE_FLAG_JUMP_LEFT) {
 								this.isJumpingOver = true;
 								obj.moveX = 3;
 								obj.moveZ = 3;
+							} else {
+								obj.moveX = 0;
 							}
-							obj.moveX = 0;
 						}
 
-						if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 && obj.moveY > 0 && is_solid) {
+						if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 2 && obj.moveY > 0 && is_solid) {
 							if (block.teleport) {
 								if (block.teleport.level) {
 									this.loadLevel(block.teleport.level);
@@ -579,27 +584,34 @@ var Tilda = function () {
 							}
 						}
 
-						if (obj.x > left - TILE_SIZE * .9 && obj.x < left + TILE_SIZE * .7 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE * 0.9 && obj.moveY < 0 && is_solid) {
-							if (block.script.length > 0) {
+						if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE - 1 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE && is_solid) {
+							if (block.script && block.script.length > 0 && this.aKeyPressed) {
+								// #QINOTE #AQUAJOGGING@R@CT
 								try {
 									var func = new Function(block.script);
 									func.apply(this);
-								} catch (e) {}
-							}
-							if (block.teleport) {
-								if (block.teleport.level) {
-									this.loadLevel(block.teleport.level);
+								} catch (e) {
+									console.log(e.stack);
 								}
 							}
-							if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
-								this.isJumpingOver = true;
-								obj.moveY = -0.6;
-								obj.moveZ = 1;
-							} else {
-								obj.moveY = 0;
+
+							if (obj.moveY < 0) {
+
+								if (block.teleport) {
+									if (block.teleport.level) {
+										this.loadLevel(block.teleport.level);
+									}
+								}
+								if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
+									this.isJumpingOver = true;
+									obj.moveY = -0.6;
+									obj.moveZ = 1;
+								} else {
+									obj.moveY = -0;
+								}
+								this.activeBlock = block;
+								collidied = true;
 							}
-							this.activeBlock = block;
-							collidied = true;
 						}
 						if (!collidied) {
 							this.activeBlock = null;
@@ -611,8 +623,6 @@ var Tilda = function () {
 	}, {
 		key: 'render',
 		value: function render() {
-			var _this5 = this;
-
 			this.renderer.clear();
 			if (this.level) {
 				for (var x in this.level.blocks) {
@@ -681,9 +691,6 @@ var Tilda = function () {
 				this.renderer.context.fillRect(10, 22, 180, 60);
 				this.renderer.context.fillStyle = 'white';
 				wrapText(this.renderer.context, this.text, 22, 32, 180, 9);
-				setTimeout(function () {
-					_this5.text = '';
-				}, 1000);
 			}
 		}
 	}]);
@@ -768,13 +775,13 @@ var CharacterEntity = function (_Entity) {
 	function CharacterEntity(game, level) {
 		_classCallCheck(this, CharacterEntity);
 
-		var _this6 = _possibleConstructorReturn(this, Object.getPrototypeOf(CharacterEntity).call(this, game, level));
+		var _this4 = _possibleConstructorReturn(this, Object.getPrototypeOf(CharacterEntity).call(this, game, level));
 
-		_this6.level = level;
-		_this6.tileX = 2;
-		_this6.tileY = 1;
+		_this4.level = level;
+		_this4.tileX = 2;
+		_this4.tileY = 1;
 
-		return _this6;
+		return _this4;
 	}
 
 	_createClass(CharacterEntity, [{
@@ -850,72 +857,95 @@ var PlayerEntity = function (_CharacterEntity) {
 	function PlayerEntity(game, level) {
 		_classCallCheck(this, PlayerEntity);
 
-		var _this7 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
+		var _this5 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
 
-		_this7.x = _this7.level.player.x;
-		_this7.y = _this7.level.player.y;
+		_this5.x = _this5.level.player.x;
+		_this5.y = _this5.level.player.y;
 
 		window.onkeydown = function (event) {
-			if (_this7.game.status.locked) {
+
+			_this5.game.keysPressed.push(event.code);
+			if (_this5.game.status.locked) {
 				return;
 			}
-			if (_this7.game.isJumpingOver) {
+			if (_this5.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				_this7.walkUp();
+				_this5.walkUp();
 			}
 			if (event.code == 'ArrowDown') {
-				_this7.walkDown();
+				_this5.walkDown();
 			}
 			if (event.code == 'ArrowLeft') {
-				_this7.walkLeft();
+				_this5.walkLeft();
 			}
 			if (event.code == 'ArrowRight') {
-				_this7.walkRight();
+				_this5.walkRight();
 			}
 			if (event.code == 'KeyA') {
-				if (_this7.game.activeBlock) {
-					if (_this7.game.activeBlock.script.length > 0) {
+				_this5.game.aKeyPressed = true;
+				console.log(_this5.aKeyPressed);
+				_this5.game.next();
+				if (_this5.game.activeBlock) {
+					if (_this5.game.activeBlock.script.length > 0) {
 						try {
-							var func = new Function(_this7.game.activeBlock.script);
-							func.apply(_this7.game);
-						} catch (e) {}
+							var func = new Function(_this5.game.activeBlock.script);
+							func.apply(_this5.game);
+						} catch (e) {
+							console.log(e.stack);
+						}
 					}
 
-					_this7.game.text = '';
-					_this7.game.activeBlock = null;
+					_this5.game.text = '';
+					_this5.game.activeBlock = null;
 					return;
 				}
-				_this7.jump();
+				_this5.jump();
 			}
 		};
 		window.onkeyup = function (event) {
-			if (_this7.game.isJumpingOver) {
+
+			_this5.game.keysPressed = array_remove(_this5.game.keysPressed, event.code);
+			if (_this5.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				_this7.moveY = -0;
+				_this5.moveY = -0;
 			}
 			if (event.code == 'ArrowDown') {
-				_this7.moveY = 0;
+				_this5.moveY = 0;
 			}
 			if (event.code == 'ArrowLeft') {
-				_this7.moveX = -0;
+				_this5.moveX = -0;
 			}
 			if (event.code == 'ArrowRight') {
-				_this7.moveX = 0;
+				_this5.moveX = 0;
 			}
 			if (event.code == 'KeyA') {
-				_this7.moveZ = 0;
+				_this5.game.aKeyPressed = false;
+				_this5.moveZ = 0;
 			}
 		};
 
-		return _this7;
+		return _this5;
 	}
 
 	return PlayerEntity;
 }(CharacterEntity);
+
+// http://stackoverflow.com/questions/9792927/javascript-array-search-and-remove-string
+
+
+function array_remove(array, elem, all) {
+	for (var i = array.length - 1; i >= 0; i--) {
+		if (array[i] === elem) {
+			array.splice(i, 1);
+			if (!all) break;
+		}
+	}
+	return array;
+};
 
 var Block = function Block(tile) {
 	_classCallCheck(this, Block);
@@ -960,7 +990,7 @@ var Level = function () {
 			for (var x in this.blocks) {
 				for (var y in this.blocks[x]) {
 					var block = this.blocks[x][y];
-					if (!block) {
+					if (!block && block == null) {
 						return;
 					}
 					jsonData.blocks.push(block);
@@ -973,9 +1003,7 @@ var Level = function () {
 				if (xmlHttp.readyState == 4) {
 					if (xmlHttp.status == 200) {
 						var json = JSON.parse(xmlHttp.responseText);
-					} else {
-						debugger;
-					}
+					} else {}
 				}
 			};
 			xmlHttp.open("PUT", "/api/levels/" + this.id + '', true);
@@ -984,8 +1012,10 @@ var Level = function () {
 		}
 	}, {
 		key: 'addEntity',
-		value: function addEntity(type) {
+		value: function addEntity(type, x, y) {
 			var t = new type(this.game, this);
+			t.x = x * TILE_SIZE;
+			t.y = y * TILE_SIZE;
 			return t;
 		}
 	}]);
@@ -997,12 +1027,13 @@ var Level = function () {
 		this.name = level.name;
 		this.entities = {};
 		this.blocks = {};
+		this.player = level.player;
 		this.flags = level.flags;
 		this.script = level.script;
 		this.objects = [];
 		for (var i in level.blocks) {
 			var block = level.blocks[i];
-			this.setBlock(block.x, block.y, block);
+			if (block != null) this.setBlock(block.x, block.y, block);
 		}
 		this.player = new PlayerEntity(game, level);
 		if ('entities' in level) {

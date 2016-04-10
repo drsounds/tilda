@@ -44,7 +44,7 @@ window.addEventListener('load', () => {
 	});
 	document.querySelector('#toolbar').addEventListener('mousedown', function (event) {
             var x = event.pageX;
-            var y = event.pageY;
+            var y = event.pageY - $('#toolbar').offset().top;
             var TILE_SIZE = 16;
             var tileX = Math.floor((x + 1) / TILE_SIZE);
             var tileY = Math.floor((y + 1) / TILE_SIZE);
@@ -75,6 +75,9 @@ window.addEventListener('load', () => {
 	
 	game.addEventListener('selectedblock', (event) => {
 		var block = event.data.block;
+		if (!block) {
+			return;
+		}
         if (!block.teleport) {
             block.teleport = {
                 x: 0,
@@ -92,7 +95,7 @@ window.addEventListener('load', () => {
 	window.save = function () {
 		try {
 			var block = game.editor.selectedBlock;
-			block.script = $('#script').val();
+			block.script = $('#object_script').val();
             block.yin = parseInt($('#yin').val());
             block.yang = parseInt($('#yang').val());
             block.teleport = {
