@@ -255,7 +255,7 @@ export class Tilda {
 			}
 			if (event.which == 3) {
 				event.preventDefault();
-				this.level.removeBlock(pos.x, pos.y);
+				this.level.removeBlock(pos.x + this.cameraX / TILE_SIZE, pos.y + this.cameraY / TILE_SIZE);
 				this.level.save();
 			}
 		});
