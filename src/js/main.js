@@ -21,9 +21,9 @@ window.addEventListener('load', () => {
 	
 	var documentNode = dockManager.context.model.documentManagerNode;
 	
-	dockManager.dockRight(documentNode, propertiesEditor, 0.2);
+	dockManager.dockRight(documentNode, propertiesEditor, 0.1);
 	dockManager.dockFill(documentNode, canvas);
-	dockManager.dockLeft(documentNode, toolbox, 0.2);
+	dockManager.dockUp(documentNode, toolbox, 0.2);
 	dockManager.dockDown(documentNode, scriptEditor, 0.2);
 	
 	window.onresize = function (event) {
@@ -39,8 +39,6 @@ window.addEventListener('load', () => {
 	   iframe.style.height = 1200;
 	   game.propertiesWindow = document.querySelector('iframe#properties');
 	   $('#script').val(game.level.script);
-		
-		
 	});
 	document.querySelector('#toolbar').addEventListener('mousedown', function (event) {
             var x = event.pageX;
@@ -72,7 +70,9 @@ window.addEventListener('load', () => {
             game.editor.activeBlockType = type;
             game.editor.tool = tool;
         });
-	
+	window.addEventListener('message', (event) => {
+		
+	});
 	game.addEventListener('selectedblock', (event) => {
 		var block = event.data.block;
 		if (!block) {
@@ -104,6 +104,7 @@ window.addEventListener('load', () => {
                 level: $('#teleport_level').val()
             };
 			game.setBlock(block);
+			debugger;
 		} catch (e) {
 		}
 		game.level.script = $('#script').val();	 

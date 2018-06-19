@@ -88,13 +88,30 @@ export class Tilda {
 	seq() {
 		this.sequence = arguments[0];
 		if (!this.sequence) {
-			debugger;
+			
 		}
 		this.next();
 	}
 	
-	getObject(obj) {
-		
+	/**
+	 * Returns the cluster the player is in 
+	 **/
+	getCluster() {
+		var clusterX = Math.floor((this.level.player.x + 1) / this.gameWidth);
+		var clusterY = Math.floor((this.level.player.y + 1) / this.gameHeight);
+		return {
+			x: clusterX,
+			y: clusterY
+		};
+	}
+	
+	addEntity(id, type, x, y) {
+		var cluster = this.getCluster();
+		return this.level.addEntity(id, type, x + cluster.x * this.gameWidth, cluster.y * this.gameHeight);
+	}
+	
+	getEntity(obj) {
+		return this.level.entities[obj];
 	} 
 	
 	lock() {
@@ -156,18 +173,25 @@ export class Tilda {
 	}
 	
 	constructor (renderer) {
-		
+		this.timers = {};
 		this.gameWidth = 192;
+		
+		this.gameUrl = '';
 		this.gameHeight = 192;
 		renderer.canvas.width = this.gameWidth;
 		renderer.canvas.height = this.gameHeight;
-	
+		
+		this.sequences = {};
 		
 		this.renderer = renderer;
 		this.zoom = {
 			x: 1,
 			y: 1
 		};
+		this.entityTypes = {
+			'CharacterEntity': CharacterEntity,
+			'PlayerEntity': PlayerEntity
+		}
 		this.level = null;
 		this.blockTypes = {};
 		this.editor = {
@@ -218,7 +242,7 @@ export class Tilda {
 		    }
 		}
 		};
-		xmlHttp.open('GET', '/t.tileset', true);
+		xmlHttp.open('GET', this.gameUrl + '/t.tileset', true);
 		xmlHttp.send(null);
 		this.renderer.canvas.addEventListener('mousedown', (event) => {
 			if (this.mode != MODE_EDITING) {
@@ -241,7 +265,7 @@ export class Tilda {
 					case TOOL_POINTER:
 						this.editor.selectedX = pos.x;
 						this.editor.selectedY = pos.y;
-						this.editor.selectedBlock = this.level.blocks[this.editor.selectedX + this.cameraX / TILE_SIZE][this.editor.selectedY + this.cameraY / TILE_SIZE];
+						this.editor.selectedBlock = this.level.blocks[this.editor.selectedX + this.cameraX][this.editor.selectedY + this.cameraY];
 						var evt = new CustomEvent('selectedblock');
 						evt.data =
 							{
@@ -255,8 +279,10 @@ export class Tilda {
 			}
 			if (event.which == 3) {
 				event.preventDefault();
-				this.level.removeBlock(pos.x + this.cameraX / TILE_SIZE, pos.y + this.cameraY / TILE_SIZE);
-				this.level.save();
+				if (confirm('Do you want to delete this block?')) {
+					this.level.removeBlock(pos.x + this.cameraX / TILE_SIZE, pos.y + this.cameraY / TILE_SIZE);
+					this.level.save();
+				}
 			}
 		});
 		
@@ -287,6 +313,25 @@ export class Tilda {
 			if (bt.tileX == blockType.tileX && bt.tileY == blockType.tileY && bt.flags == blockType.flags) {
 				return b;
 			}
+		}
+	}
+	
+	setTimer(id, time, callback) {
+		this.timers[id] = {
+			frame: 0,
+			time: time,
+			callback: callback
+		};
+	}
+	
+	playSequence(sequence) {
+		for (var a in sequence) {
+			debugger;	
+			var action = sequence[a];
+			this.setTimer({
+				time: action.time,
+				callback: action.callback
+			});
 		}
 	}
 	
@@ -329,7 +374,7 @@ export class Tilda {
 					}
 				}
 			}
-			xmlHttp.open('GET', '/api/levels/' + id, true);
+			xmlHttp.open('GET', this.gameUrl + '/api/levels/' + id, true);
 			xmlHttp.send(null);
 		});
 	}
@@ -356,6 +401,13 @@ export class Tilda {
 	}
 	
 	tick() {
+		for (var i in this.timers) {
+			this.timers[i].frame += 1;
+			if (this.timers[i].frame == this.timers.time) {
+				debugger;
+				this.timers[i].callback.call(this);
+			}
+		}
 		for (var i in this.level.objects) {
 			var obj = this.level.objects[i];
 			obj.tick();
@@ -382,8 +434,8 @@ export class Tilda {
 					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE * 0.8 && obj.y < top + TILE_SIZE / 2 - 1 && obj.moveX > 0 && is_solid) {
 						if ((blockType.flags & TILE_FLAG_JUMP_RIGHT) == TILE_FLAG_JUMP_RIGHT) {
 							this.isJumpingOver = true;
-							obj.moveX = .6;
-							obj.moveZ = 3;
+							obj.moveX = .2;
+							obj.moveZ = 1;
 						} else {
 							obj.moveX = 0;
 						}
@@ -393,8 +445,8 @@ export class Tilda {
 						
 						if ((blockType.flags & TILE_FLAG_JUMP_LEFT)  == TILE_FLAG_JUMP_LEFT) {
 							this.isJumpingOver = true;
-							obj.moveX = 3;
-							obj.moveZ = 3;
+							obj.moveX = -.2;
+							obj.moveZ = 1;
 						}  else {
 							obj.moveX = 0;
 						}
@@ -417,12 +469,34 @@ export class Tilda {
 
 					if (obj.x > left - TILE_SIZE  && obj.x < left + TILE_SIZE -1 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE && is_solid) {
 						if (block.script && block.script.length > 0 && this.aKeyPressed) { // #QINOTE #AQUAJOGGING@R@CT
-							try {
-								var func = new Function(block.script);
-								func.apply(this);
-							}catch(e) {
-								console.log(e.stack);
+							if (block.script.indexOf('res://') == 0) {
+								
+								var xmlHttp = new XMLHttpRequest();
+								xmlHttp.onreadystatechange = () => {
+									if (xmlHttp.readyState == 4) {
+										if (xmlHttp.status == 200) {
+		 									try {
+												var func = new Function(xmlHttp.responseText);
+												func = func.bind(this);
+												func();
+											}catch(e) {
+												console.log(e.stack);
+											}
+										}
+ 									}
+								};
+								xmlHttp.open('GET', this.gameUrl + block.script.substr('res://'.length));
+								xmlHttp.send(null);
+							} else {
+								try {
+									var func = new Function(block.script);
+									func.apply(this);
+								}catch(e) {
+									console.log(e.stack);
+								}
 							}
+						
+						
 						}
 						
 						if (obj.moveY < 0) {
@@ -496,7 +570,7 @@ export class Tilda {
 				var height = TILE_SIZE * this.zoom.y;
 				var left = (i * TILE_SIZE) * this.zoom.x;
 				var top = (this.renderer.canvas.height ) - TILE_SIZE * 2;
-				//this.renderer.renderImageChunk(this.tileset, left, top, width, height, block.tileX * TILE_SIZE, block.tileY * TILE_SIZE, width, height);
+				//this.renderer.renderImageChunk(this.tile, left, top, width, height, block.tileX * TILE_SIZE, block.tileY * TILE_SIZE, width, height);
 			}
 		}
 		
@@ -597,6 +671,17 @@ class Entity {
 }
 
 
+class SupplementEntity extends Entity {
+	constructor(game, level) {
+		super(game, level);
+		this.level = level;
+		this.tileX = 2;
+		this.tileY = 1;
+		
+	}
+}
+
+
 class CharacterEntity extends Entity {
 	constructor(game, level) {
 		super(game, level);
@@ -665,9 +750,9 @@ class PlayerEntity extends CharacterEntity {
 		super(game, level);
 		this.x = this.level.player.x;
 		this.y = this.level.player.y;
+		this.game.renderer.canvas.tabIndex = 1000;
 		
-		
-		window.onkeydown = (event) => {
+		this.game.renderer.canvas.onkeydown = (event) => {
 			
 			this.game.keysPressed.push(event.code);
 			if (this.game.status.locked) {
@@ -711,22 +796,26 @@ class PlayerEntity extends CharacterEntity {
 				this.jump();
 			}
 		}
-		window.onkeyup = (event) => {
+		this.game.renderer.canvas.onkeyup = (event) => {
 	
 			this.game.keysPressed = array_remove(this.game.keysPressed, event.code);
 			if (this.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
+				if (this.moveY < 0)
 				this.moveY = -0;
 			}
 			if (event.code == 'ArrowDown') {
+				if (this.moveY > 0)
 				this.moveY = 0;
 			}
 			if (event.code == 'ArrowLeft') {
+				if (this.moveX < 0)
 				this.moveX = -0;
 			}
 			if (event.code == 'ArrowRight') {
+				if (this.moveX > 0)
 				this.moveX = 0;
 			}
 			if (event.code == 'KeyA') {
@@ -809,14 +898,15 @@ class Level {
 				}
 			}
 		}
-		xmlHttp.open("PUT", "/api/levels/" + this.id + '', true);
+		xmlHttp.open("PUT", this.game.gameUrl + "/api/levels/" + this.id + '', true);
 		xmlHttp.setRequestHeader("Content-Type", "application/json");
 		xmlHttp.send(json_upload);
 	}
-	addEntity(type, x ,y) {
-		var t = new type(this.game, this);
+	addEntity(id, type, x ,y) {
+		var t = new this.game.entityTypes[type](this.game, this);
 		t.x = x * TILE_SIZE;
 		t.y = y * TILE_SIZE;
+		this.level.entities[id] = t;
 		return t;
 	}
 	constructor(game, level) {
@@ -827,6 +917,7 @@ class Level {
 		this.player = level.player;
 		this.flags = level.flags;
 		this.script = level.script;
+		
 		this.objects = [];
 		for (var i in level.blocks) {
 			var block = level.blocks[i];

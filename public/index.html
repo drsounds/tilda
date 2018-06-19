@@ -45,8 +45,8 @@
 		}
 	    </style>
 	    <link rel="stylesheet" href="css/dock-manager.css">
-<script src="js/ace.js" type="text/javascript" charset="utf-8"></script>
-<script src="js/dockspawn.js" type="text/javascript" charset="utf-8"></script>
+		<script src="js/ace.js" type="text/javascript" charset="utf-8"></script>
+		<script src="js/dockspawn.js" type="text/javascript" charset="utf-8"></script>
 	</head>
 	<body>
 		<div id="properties">
@@ -74,13 +74,16 @@
 	                </td>
 	            </tr>
 	            <tr>
-	                <td>Script</td>
+	                <td>Script file</td>
 	                <td>
-	                    <textarea onblur="save(event)" id="object_script">
-	                        
-	                    </textarea>
+	                    <input type="text" onblur="save(event)" id="object_script" name="script" placeholder="script file.js">
 	                    
 	                </td>
+	            </tr>
+	            <tr>
+	            	<td colspan="2">
+	            		<button onclick="save(event)" id="save">Save</button>
+	            	</td>
 	            </tr>
 	        </table>
 		</div>
@@ -88,7 +91,6 @@
 			<canvas></canvas>
 		</div>
 		<div id="scriptWindow">
-			<textarea style="width: 360pt; height:800pt"  id="script" onblur="save(event)"></textarea>
 				
 		</div>
 		<div id="toolbar" style="position: relative; background-repeat: no-repeat; background-image: url('img/tileset.png')">

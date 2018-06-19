@@ -4,25 +4,25 @@
         <title>Toolbar</title>
         <style>
              html, body {
-		    overflow: hidden;
-		    width: 100%;
-		    height: 100%;
-		    margin: 0;
-		    background-repeat: no-repeat;
-		    padding: 0;
-		      background-image: url('img/tileset.png');
+    		    overflow: hidden;
+    		    width: 100%;
+    		    height: 100%;
+    		    margin: 0;
+    		    background-repeat: no-repeat;
+    		    padding: 0;
+                  background-image: url('img/tileset.png');
                  
              }
         </style>
         <script>
        
         function Block(tile) {
-        	
-        		var parts = tile.split(' ');
-        		this.id = (parts[0])
-        		this.tileX = parseInt(parts[1]);
-        		this.tileY = parseInt(parts[2]);
-        		this.flags = parseInt(parts[3]);
+    	
+    		var parts = tile.split(' ');
+    		this.id = (parts[0])
+    		this.tileX = parseInt(parts[1]);
+    		this.tileY = parseInt(parts[2]);
+    		this.flags = parseInt(parts[3]);
         	
         }
         var tiles = [];
