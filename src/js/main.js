@@ -1,16 +1,22 @@
 const {Tilda, CanvasRenderer} = require('./tilda.js');
 
-
+const queryString = require('query-string');
 window.addEventListener('load', () => {
     var canvasRenderer = new CanvasRenderer(document.querySelector('canvas'));
 	var game = new Tilda(canvasRenderer);
 	
 	var path = window.location.pathname.substr(1).split(/\//g);
+	const parsed = queryString.parse(window.location.search);
+	let location = {x: 0, y: 0}
+	
+	if (parsed.x) location.x = parseFloat(parsed.x)
+	if (parsed.y ) location.y = parseFloat(parsed.y)
 	var level = 'overworld';
 	console.log(path);
 	if (path.length > 1) {
 		level = path[1];
 	}
+	
 	var dockManager = new dockspawn.DockManager(document.querySelector("body"));
 	dockManager.initialize();
 
@@ -33,7 +39,7 @@ window.addEventListener('load', () => {
 	//var editor = ace.edit('script');
 	//editor.getSession().setMode('ace/mode/javascript');
 	//editor.setTheme('ace/theme/monokai');
-	game.loadLevel(level).then((level) => {
+	game.loadLevel(level, location).then((level) => {
 	   game.start(); 
 	   var iframe = document.createElement('iframe');
 	   iframe.style.height = 1200;
@@ -110,13 +116,37 @@ window.addEventListener('load', () => {
 		game.level.script = $('#script').val();	 
 	   	game.level.save();	
 	};
+	game.addEventListener('move', function (event) {
+		history.replaceState(
+			{
+				level: {
+					id:event.data.level.id,
+					player: {
+						x: event.data.level.player.x,
+						y: event.data.level.player.y
+					}
+				}
+			},
+			'Level',
+			'/level/' + event.data.level.id + '?x=' + event.data.level.player.x + '&y=' +  event.data.level.player.y
+		
+		);
+	})
 	game.addEventListener('levelchanged', function (event) {
 		history.pushState(
 			{
-				level: event.data.level.id
+				level: {
+					id:event.data.level.id,
+					player: {
+						x: event.data.level.player.x,
+						y: event.data.level.player.y
+					}
+				},
+				position: event.data.position
 			},
 			'Level',
-			'/level/' + event.data.level.id
+			'/level/' + event.data.level.id + '?x=' + event.data.level.player.x + '&y=' +  event.data.level.player.y
+		
 		);
 		 $('#script').val(game.level.script);
 	});

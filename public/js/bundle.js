@@ -1,22 +1,351 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+'use strict';
+const strictUriEncode = require('strict-uri-encode');
+const decodeComponent = require('decode-uri-component');
+
+function encoderForArrayFormat(options) {
+	switch (options.arrayFormat) {
+		case 'index':
+			return (key, value, index) => {
+				return value === null ? [
+					encode(key, options),
+					'[',
+					index,
+					']'
+				].join('') : [
+					encode(key, options),
+					'[',
+					encode(index, options),
+					']=',
+					encode(value, options)
+				].join('');
+			};
+		case 'bracket':
+			return (key, value) => {
+				return value === null ? [encode(key, options), '[]'].join('') : [
+					encode(key, options),
+					'[]=',
+					encode(value, options)
+				].join('');
+			};
+		default:
+			return (key, value) => {
+				return value === null ? encode(key, options) : [
+					encode(key, options),
+					'=',
+					encode(value, options)
+				].join('');
+			};
+	}
+}
+
+function parserForArrayFormat(options) {
+	let result;
+
+	switch (options.arrayFormat) {
+		case 'index':
+			return (key, value, accumulator) => {
+				result = /\[(\d*)\]$/.exec(key);
+
+				key = key.replace(/\[\d*\]$/, '');
+
+				if (!result) {
+					accumulator[key] = value;
+					return;
+				}
+
+				if (accumulator[key] === undefined) {
+					accumulator[key] = {};
+				}
+
+				accumulator[key][result[1]] = value;
+			};
+		case 'bracket':
+			return (key, value, accumulator) => {
+				result = /(\[\])$/.exec(key);
+				key = key.replace(/\[\]$/, '');
+
+				if (!result) {
+					accumulator[key] = value;
+					return;
+				}
+
+				if (accumulator[key] === undefined) {
+					accumulator[key] = [value];
+					return;
+				}
+
+				accumulator[key] = [].concat(accumulator[key], value);
+			};
+		default:
+			return (key, value, accumulator) => {
+				if (accumulator[key] === undefined) {
+					accumulator[key] = value;
+					return;
+				}
+
+				accumulator[key] = [].concat(accumulator[key], value);
+			};
+	}
+}
+
+function encode(value, options) {
+	if (options.encode) {
+		return options.strict ? strictUriEncode(value) : encodeURIComponent(value);
+	}
+
+	return value;
+}
+
+function decode(value, options) {
+	if (options.decode) {
+		return decodeComponent(value);
+	}
+
+	return value;
+}
+
+function keysSorter(input) {
+	if (Array.isArray(input)) {
+		return input.sort();
+	}
+
+	if (typeof input === 'object') {
+		return keysSorter(Object.keys(input))
+			.sort((a, b) => Number(a) - Number(b))
+			.map(key => input[key]);
+	}
+
+	return input;
+}
+
+function extract(input) {
+	const queryStart = input.indexOf('?');
+	if (queryStart === -1) {
+		return '';
+	}
+	return input.slice(queryStart + 1);
+}
+
+function parse(input, options) {
+	options = Object.assign({decode: true, arrayFormat: 'none'}, options);
+
+	const formatter = parserForArrayFormat(options);
+
+	// Create an object with no prototype
+	const ret = Object.create(null);
+
+	if (typeof input !== 'string') {
+		return ret;
+	}
+
+	input = input.trim().replace(/^[?#&]/, '');
+
+	if (!input) {
+		return ret;
+	}
+
+	for (const param of input.split('&')) {
+		let [key, value] = param.replace(/\+/g, ' ').split('=');
+
+		// Missing `=` should be `null`:
+		// http://w3.org/TR/2012/WD-url-20120524/#collect-url-parameters
+		value = value === undefined ? null : decode(value, options);
+
+		formatter(decode(key, options), value, ret);
+	}
+
+	return Object.keys(ret).sort().reduce((result, key) => {
+		const value = ret[key];
+		if (Boolean(value) && typeof value === 'object' && !Array.isArray(value)) {
+			// Sort object keys, not values
+			result[key] = keysSorter(value);
+		} else {
+			result[key] = value;
+		}
+
+		return result;
+	}, Object.create(null));
+}
+
+exports.extract = extract;
+exports.parse = parse;
+
+exports.stringify = (obj, options) => {
+	const defaults = {
+		encode: true,
+		strict: true,
+		arrayFormat: 'none'
+	};
+
+	options = Object.assign(defaults, options);
+
+	if (options.sort === false) {
+		options.sort = () => {};
+	}
+
+	const formatter = encoderForArrayFormat(options);
+
+	return obj ? Object.keys(obj).sort(options.sort).map(key => {
+		const value = obj[key];
+
+		if (value === undefined) {
+			return '';
+		}
+
+		if (value === null) {
+			return encode(key, options);
+		}
+
+		if (Array.isArray(value)) {
+			const result = [];
+
+			for (const value2 of value.slice()) {
+				if (value2 === undefined) {
+					continue;
+				}
+
+				result.push(formatter(key, value2, result.length));
+			}
+
+			return result.join('&');
+		}
+
+		return encode(key, options) + '=' + encode(value, options);
+	}).filter(x => x.length > 0).join('&') : '';
+};
+
+exports.parseUrl = (input, options) => {
+	return {
+		url: input.split('?')[0] || '',
+		query: parse(extract(input), options)
+	};
+};
+
+},{"decode-uri-component":2,"strict-uri-encode":3}],2:[function(require,module,exports){
+'use strict';
+var token = '%[a-f0-9]{2}';
+var singleMatcher = new RegExp(token, 'gi');
+var multiMatcher = new RegExp('(' + token + ')+', 'gi');
+
+function decodeComponents(components, split) {
+	try {
+		// Try to decode the entire string first
+		return decodeURIComponent(components.join(''));
+	} catch (err) {
+		// Do nothing
+	}
+
+	if (components.length === 1) {
+		return components;
+	}
+
+	split = split || 1;
+
+	// Split the array in 2 parts
+	var left = components.slice(0, split);
+	var right = components.slice(split);
+
+	return Array.prototype.concat.call([], decodeComponents(left), decodeComponents(right));
+}
+
+function decode(input) {
+	try {
+		return decodeURIComponent(input);
+	} catch (err) {
+		var tokens = input.match(singleMatcher);
+
+		for (var i = 1; i < tokens.length; i++) {
+			input = decodeComponents(tokens, i).join('');
+
+			tokens = input.match(singleMatcher);
+		}
+
+		return input;
+	}
+}
+
+function customDecodeURIComponent(input) {
+	// Keep track of all the replacements and prefill the map with the `BOM`
+	var replaceMap = {
+		'%FE%FF': '\uFFFD\uFFFD',
+		'%FF%FE': '\uFFFD\uFFFD'
+	};
+
+	var match = multiMatcher.exec(input);
+	while (match) {
+		try {
+			// Decode as big chunks as possible
+			replaceMap[match[0]] = decodeURIComponent(match[0]);
+		} catch (err) {
+			var result = decode(match[0]);
+
+			if (result !== match[0]) {
+				replaceMap[match[0]] = result;
+			}
+		}
+
+		match = multiMatcher.exec(input);
+	}
+
+	// Add `%C2` at the end of the map to make sure it does not replace the combinator before everything else
+	replaceMap['%C2'] = '\uFFFD';
+
+	var entries = Object.keys(replaceMap);
+
+	for (var i = 0; i < entries.length; i++) {
+		// Replace all decoded components
+		var key = entries[i];
+		input = input.replace(new RegExp(key, 'g'), replaceMap[key]);
+	}
+
+	return input;
+}
+
+module.exports = function (encodedURI) {
+	if (typeof encodedURI !== 'string') {
+		throw new TypeError('Expected `encodedURI` to be of type `string`, got `' + typeof encodedURI + '`');
+	}
+
+	try {
+		encodedURI = encodedURI.replace(/\+/g, ' ');
+
+		// Try the built in decoder first
+		return decodeURIComponent(encodedURI);
+	} catch (err) {
+		// Fallback to a more advanced decoder
+		return customDecodeURIComponent(encodedURI);
+	}
+};
+
+},{}],3:[function(require,module,exports){
+'use strict';
+module.exports = str => encodeURIComponent(str).replace(/[!'()*]/g, x => `%${x.charCodeAt(0).toString(16).toUpperCase()}`);
+
+},{}],4:[function(require,module,exports){
 'use strict';
 
-var _require = require('./tilda.js');
+var _require = require('./tilda.js'),
+    Tilda = _require.Tilda,
+    CanvasRenderer = _require.CanvasRenderer;
 
-var Tilda = _require.Tilda;
-var CanvasRenderer = _require.CanvasRenderer;
-
-
+var queryString = require('query-string');
 window.addEventListener('load', function () {
 	var canvasRenderer = new CanvasRenderer(document.querySelector('canvas'));
 	var game = new Tilda(canvasRenderer);
 
 	var path = window.location.pathname.substr(1).split(/\//g);
+	var parsed = queryString.parse(window.location.search);
+	var location = { x: 0, y: 0 };
+
+	if (parsed.x) location.x = parseFloat(parsed.x);
+	if (parsed.y) location.y = parseFloat(parsed.y);
 	var level = 'overworld';
 	console.log(path);
 	if (path.length > 1) {
 		level = path[1];
 	}
+
 	var dockManager = new dockspawn.DockManager(document.querySelector("body"));
 	dockManager.initialize();
 
@@ -39,7 +368,7 @@ window.addEventListener('load', function () {
 	//var editor = ace.edit('script');
 	//editor.getSession().setMode('ace/mode/javascript');
 	//editor.setTheme('ace/theme/monokai');
-	game.loadLevel(level).then(function (level) {
+	game.loadLevel(level, location).then(function (level) {
 		game.start();
 		var iframe = document.createElement('iframe');
 		iframe.style.height = 1200;
@@ -113,15 +442,33 @@ window.addEventListener('load', function () {
 		game.level.script = $('#script').val();
 		game.level.save();
 	};
+	game.addEventListener('move', function (event) {
+		history.replaceState({
+			level: {
+				id: event.data.level.id,
+				player: {
+					x: event.data.level.player.x,
+					y: event.data.level.player.y
+				}
+			}
+		}, 'Level', '/level/' + event.data.level.id + '?x=' + event.data.level.player.x + '&y=' + event.data.level.player.y);
+	});
 	game.addEventListener('levelchanged', function (event) {
 		history.pushState({
-			level: event.data.level.id
-		}, 'Level', '/level/' + event.data.level.id);
+			level: {
+				id: event.data.level.id,
+				player: {
+					x: event.data.level.player.x,
+					y: event.data.level.player.y
+				}
+			},
+			position: event.data.position
+		}, 'Level', '/level/' + event.data.level.id + '?x=' + event.data.level.player.x + '&y=' + event.data.level.player.y);
 		$('#script').val(game.level.script);
 	});
 });
 
-},{"./tilda.js":2}],2:[function(require,module,exports){
+},{"./tilda.js":5,"query-string":1}],5:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -186,13 +533,21 @@ var Setence = function Setence(setence) {
 	this.duration = parts[3];
 };
 
+function sleep(seconds) {
+	return new Promise(function (resolve, fail) {
+		setTimeout(function () {
+			resolve();
+		}, seconds);
+	});
+}
+
 var CanvasRenderer = exports.CanvasRenderer = function (_Renderer) {
 	_inherits(CanvasRenderer, _Renderer);
 
 	function CanvasRenderer(canvas) {
 		_classCallCheck(this, CanvasRenderer);
 
-		var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(CanvasRenderer).call(this));
+		var _this = _possibleConstructorReturn(this, (CanvasRenderer.__proto__ || Object.getPrototypeOf(CanvasRenderer)).call(this));
 
 		_this.canvas = canvas;
 		_this.context = canvas.getContext('2d');
@@ -493,26 +848,36 @@ var Tilda = function () {
 		}
 	}, {
 		key: 'playSequence',
-		value: function playSequence(sequence) {
-			for (var a in sequence) {
-				debugger;
-				var action = sequence[a];
-				this.setTimer({
-					time: action.time,
-					callback: action.callback
+		value: async function playSequence(sequence) {
+			var _this3 = this;
+
+			await Promise.all(sequence.map(function (action) {
+				return new Promise(async function (resolve, fail) {
+					await sleep(action.time);
+					action.callback(_this3);
 				});
-			}
+			}));
 		}
 	}, {
 		key: 'start',
 		value: function start() {
+			var _this4 = this;
+
 			this.gameInterval = setInterval(this.tick.bind(this), 5);
 			this.renderInterval = setInterval(this.render.bind(this), 5);
 			this.state = GAME_RUNNING;
+			this.ic = setInterval(function () {
+				var event = new CustomEvent('move');
+				event.data = {
+					level: _this4.level
+				};
+				_this4.dispatchEvent(event);
+			}, 1000);
 		}
 	}, {
 		key: 'stop',
 		value: function stop() {
+			clearInterval(this.ic);
 			clearInterval(this.gameInterval);
 			clearInterval(this.renderInterval);
 			this.state = GAME_READY;
@@ -531,7 +896,9 @@ var Tilda = function () {
 	}, {
 		key: 'loadLevel',
 		value: function loadLevel(id) {
-			var _this3 = this;
+			var _this5 = this;
+
+			var position = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : { x: 0, y: 0 };
 
 			return new Promise(function (resolve, reject) {
 				var xmlHttp = new XMLHttpRequest();
@@ -539,23 +906,28 @@ var Tilda = function () {
 					if (xmlHttp.readyState == 4) {
 						if (xmlHttp.status == 200) {
 							var level = JSON.parse(xmlHttp.responseText);
-							level = new Level(_this3, level);
+							level = new Level(_this5, level);
+							level.player.x = position.x;
+							level.player.y = position.y;
+
 							level.id = id;
 
-							_this3.setLevel(level);
+							_this5.setLevel(level, position);
 							resolve(level);
 						} else {
 							reject();
 						}
 					}
 				};
-				xmlHttp.open('GET', _this3.gameUrl + '/api/levels/' + id, true);
+				xmlHttp.open('GET', _this5.gameUrl + '/api/levels/' + id, true);
 				xmlHttp.send(null);
 			});
 		}
 	}, {
 		key: 'setLevel',
 		value: function setLevel(level) {
+			var position = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : { x: 0, y: 0 };
+
 			this.level = level;
 			var evt = new CustomEvent('levelchanged');
 			evt.data = {
@@ -579,7 +951,7 @@ var Tilda = function () {
 	}, {
 		key: 'tick',
 		value: function tick() {
-			var _this4 = this;
+			var _this6 = this;
 
 			for (var i in this.timers) {
 				this.timers[i].frame += 1;
@@ -658,7 +1030,7 @@ var Tilda = function () {
 											if (xmlHttp.status == 200) {
 												try {
 													var func = new Function(xmlHttp.responseText);
-													func = func.bind(_this4);
+													func = func.bind(_this6);
 													func();
 												} catch (e) {
 													console.log(e.stack);
@@ -756,6 +1128,7 @@ var Tilda = function () {
 			var clusterY = Math.floor((this.level.player.y + 1) / this.gameHeight);
 			this.cameraX = clusterX * this.gameWidth;
 			this.cameraY = clusterY * this.gameHeight;
+
 			var width = TILE_SIZE * this.zoom.x;
 			var height = TILE_SIZE * this.zoom.y;
 			this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - TILE_SIZE * 2, TILE_SIZE, TILE_SIZE, this.activeTile.x * TILE_SIZE, this.activeTile.x * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -858,13 +1231,13 @@ var SupplementEntity = function (_Entity) {
 	function SupplementEntity(game, level) {
 		_classCallCheck(this, SupplementEntity);
 
-		var _this5 = _possibleConstructorReturn(this, Object.getPrototypeOf(SupplementEntity).call(this, game, level));
+		var _this7 = _possibleConstructorReturn(this, (SupplementEntity.__proto__ || Object.getPrototypeOf(SupplementEntity)).call(this, game, level));
 
-		_this5.level = level;
-		_this5.tileX = 2;
-		_this5.tileY = 1;
+		_this7.level = level;
+		_this7.tileX = 2;
+		_this7.tileY = 1;
 
-		return _this5;
+		return _this7;
 	}
 
 	return SupplementEntity;
@@ -876,13 +1249,13 @@ var CharacterEntity = function (_Entity2) {
 	function CharacterEntity(game, level) {
 		_classCallCheck(this, CharacterEntity);
 
-		var _this6 = _possibleConstructorReturn(this, Object.getPrototypeOf(CharacterEntity).call(this, game, level));
+		var _this8 = _possibleConstructorReturn(this, (CharacterEntity.__proto__ || Object.getPrototypeOf(CharacterEntity)).call(this, game, level));
 
-		_this6.level = level;
-		_this6.tileX = 2;
-		_this6.tileY = 1;
+		_this8.level = level;
+		_this8.tileX = 2;
+		_this8.tileY = 1;
 
-		return _this6;
+		return _this8;
 	}
 
 	_createClass(CharacterEntity, [{
@@ -958,79 +1331,79 @@ var PlayerEntity = function (_CharacterEntity) {
 	function PlayerEntity(game, level) {
 		_classCallCheck(this, PlayerEntity);
 
-		var _this7 = _possibleConstructorReturn(this, Object.getPrototypeOf(PlayerEntity).call(this, game, level));
+		var _this9 = _possibleConstructorReturn(this, (PlayerEntity.__proto__ || Object.getPrototypeOf(PlayerEntity)).call(this, game, level));
 
-		_this7.x = _this7.level.player.x;
-		_this7.y = _this7.level.player.y;
-		_this7.game.renderer.canvas.tabIndex = 1000;
+		_this9.x = _this9.level.player.x;
+		_this9.y = _this9.level.player.y;
+		_this9.game.renderer.canvas.tabIndex = 1000;
 
-		_this7.game.renderer.canvas.onkeydown = function (event) {
+		_this9.game.renderer.canvas.onkeydown = function (event) {
 
-			_this7.game.keysPressed.push(event.code);
-			if (_this7.game.status.locked) {
+			_this9.game.keysPressed.push(event.code);
+			if (_this9.game.status.locked) {
 				return;
 			}
-			if (_this7.game.isJumpingOver) {
+			if (_this9.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				_this7.walkUp();
+				_this9.walkUp();
 			}
 			if (event.code == 'ArrowDown') {
-				_this7.walkDown();
+				_this9.walkDown();
 			}
 			if (event.code == 'ArrowLeft') {
-				_this7.walkLeft();
+				_this9.walkLeft();
 			}
 			if (event.code == 'ArrowRight') {
-				_this7.walkRight();
+				_this9.walkRight();
 			}
 			if (event.code == 'KeyA') {
-				_this7.game.aKeyPressed = true;
-				console.log(_this7.aKeyPressed);
-				_this7.game.next();
-				if (_this7.game.activeBlock) {
-					if (_this7.game.activeBlock.script.length > 0) {
+				_this9.game.aKeyPressed = true;
+				console.log(_this9.aKeyPressed);
+				_this9.game.next();
+				if (_this9.game.activeBlock) {
+					if (_this9.game.activeBlock.script.length > 0) {
 						try {
-							var func = new Function(_this7.game.activeBlock.script);
-							func.apply(_this7.game);
+							var func = new Function(_this9.game.activeBlock.script);
+							func.apply(_this9.game);
 						} catch (e) {
 							console.log(e.stack);
 						}
 					}
 
-					_this7.game.text = '';
-					_this7.game.activeBlock = null;
+					_this9.game.text = '';
+					_this9.game.activeBlock = null;
 					return;
 				}
-				_this7.jump();
+				_this9.jump();
 			}
 		};
-		_this7.game.renderer.canvas.onkeyup = function (event) {
+		_this9.game.renderer.canvas.onkeyup = function (event) {
 
-			_this7.game.keysPressed = array_remove(_this7.game.keysPressed, event.code);
-			if (_this7.game.isJumpingOver) {
+			_this9.game.keysPressed = array_remove(_this9.game.keysPressed, event.code);
+			if (_this9.game.isJumpingOver) {
 				return;
 			}
 			if (event.code == 'ArrowUp') {
-				if (_this7.moveY < 0) _this7.moveY = -0;
+				if (_this9.moveY < 0) _this9.moveY = -0;
 			}
 			if (event.code == 'ArrowDown') {
-				if (_this7.moveY > 0) _this7.moveY = 0;
+				if (_this9.moveY > 0) _this9.moveY = 0;
 			}
 			if (event.code == 'ArrowLeft') {
-				if (_this7.moveX < 0) _this7.moveX = -0;
+				if (_this9.moveX < 0) _this9.moveX = -0;
 			}
 			if (event.code == 'ArrowRight') {
-				if (_this7.moveX > 0) _this7.moveX = 0;
+				if (_this9.moveX > 0) _this9.moveX = 0;
 			}
 			if (event.code == 'KeyA') {
-				_this7.game.aKeyPressed = false;
-				_this7.moveZ = 0;
+				_this9.game.aKeyPressed = false;
+				_this9.moveZ = 0;
 			}
 		};
 
-		return _this7;
+		return _this9;
 	}
 
 	return PlayerEntity;
@@ -1100,7 +1473,7 @@ var Level = function () {
 			}
 
 			var json_upload = JSON.stringify(jsonData, null, 2);
-			var xmlHttp = new XMLHttpRequest(); // new HttpRequest instance
+			var xmlHttp = new XMLHttpRequest(); // new HttpRequest instance 
 			xmlHttp.onreadystatechange = function () {
 				if (xmlHttp.readyState == 4) {
 					if (xmlHttp.status == 200) {
@@ -1161,4 +1534,4 @@ var Level = function () {
 	return Level;
 }();
 
-},{}]},{},[1]);
+},{}]},{},[4]);

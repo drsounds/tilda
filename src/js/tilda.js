@@ -47,6 +47,14 @@ class Setence {
 	}
 }
 
+function sleep(seconds) {
+	return new Promise((resolve, fail) => {
+		setTimeout(() => {
+			resolve()
+		}, seconds)
+	})
+}
+
 export class CanvasRenderer extends Renderer {
 	constructor(canvas) {
 		super();
@@ -324,24 +332,36 @@ export class Tilda {
 		};
 	}
 	
-	playSequence(sequence) {
-		for (var a in sequence) {
-			debugger;	
-			var action = sequence[a];
-			this.setTimer({
-				time: action.time,
-				callback: action.callback
-			});
-		}
+	async playSequence(sequence) {
+		await Promise.all(
+			sequence.map(
+				action => new Promise(
+					async (resolve, fail) => {
+						await sleep(action.time)
+						action.callback(this)
+					}
+				)
+			)
+		)
 	}
 	
 	start() {
 		this.gameInterval = setInterval(this.tick.bind(this), 5);
 		this.renderInterval = setInterval(this.render.bind(this), 5);
 		this.state = GAME_RUNNING;
+		this.ic = setInterval(() => {
+				let event = new CustomEvent('move')
+				event.data = {
+					level: this.level
+				}
+				this.dispatchEvent(event)
+		}, 1000)
+		
+		
 	}
 
 	stop() {
+		clearInterval(this.ic)
 		clearInterval(this.gameInterval);
 		clearInterval(this.renderInterval);
 		this.state = GAME_READY;
@@ -357,7 +377,7 @@ export class Tilda {
 		}
 	}
 
-	loadLevel(id) {
+	loadLevel(id, position={x:0, y: 0}) {
 		return new Promise((resolve, reject) => {
 			var xmlHttp = new XMLHttpRequest();
 			xmlHttp.onreadystatechange = () => {
@@ -365,9 +385,12 @@ export class Tilda {
 					if (xmlHttp.status == 200) {
 						var level = JSON.parse(xmlHttp.responseText);
 						level = new Level(this, level);
+						level.player.x = position.x
+						level.player.y = position.y
+						
 						level.id = id;
 						
-						this.setLevel(level);
+						this.setLevel(level, position);
 						resolve(level);
 					} else {
 						reject();
@@ -379,7 +402,7 @@ export class Tilda {
 		});
 	}
 
-	setLevel(level) {
+	setLevel(level, position={x: 0, y: 0}) {
 		this.level = level;
 		var evt = new CustomEvent('levelchanged');
 		evt.data = {
@@ -579,6 +602,7 @@ export class Tilda {
 		var clusterY = Math.floor((this.level.player.y + 1) / this.gameHeight);
 		this.cameraX = clusterX * this.gameWidth;
 		this.cameraY = clusterY * this.gameHeight;
+	
 		var width = TILE_SIZE * this.zoom.x;
 		var height = TILE_SIZE * this.zoom.y;
 		this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - TILE_SIZE * 2, TILE_SIZE, TILE_SIZE, this.activeTile.x * TILE_SIZE, this.activeTile.x * TILE_SIZE, TILE_SIZE, TILE_SIZE);
