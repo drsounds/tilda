@@ -271,6 +271,11 @@ export class Tilda {
 						});
 						break;
 					case TOOL_POINTER:
+						if (event.shiftKey) {
+							this.level.removeBlock(pos.x + this.cameraX / TILE_SIZE, pos.y + this.cameraY / TILE_SIZE);
+							this.level.save();
+							return
+						}
 						this.editor.selectedX = pos.x;
 						this.editor.selectedY = pos.y;
 						this.editor.selectedBlock = this.level.blocks[this.editor.selectedX + this.cameraX][this.editor.selectedY + this.cameraY];
@@ -285,13 +290,7 @@ export class Tilda {
 				this.level.save();
 			
 			}
-			if (event.which == 3) {
-				event.preventDefault();
-				if (confirm('Do you want to delete this block?')) {
-					this.level.removeBlock(pos.x + this.cameraX / TILE_SIZE, pos.y + this.cameraY / TILE_SIZE);
-					this.level.save();
-				}
-			}
+			
 		});
 		
 		

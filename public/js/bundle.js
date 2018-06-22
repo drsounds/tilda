@@ -785,6 +785,11 @@ var Tilda = function () {
 						});
 						break;
 					case TOOL_POINTER:
+						if (event.shiftKey) {
+							_this2.level.removeBlock(pos.x + _this2.cameraX / TILE_SIZE, pos.y + _this2.cameraY / TILE_SIZE);
+							_this2.level.save();
+							return;
+						}
 						_this2.editor.selectedX = pos.x;
 						_this2.editor.selectedY = pos.y;
 						_this2.editor.selectedBlock = _this2.level.blocks[_this2.editor.selectedX + _this2.cameraX][_this2.editor.selectedY + _this2.cameraY];
@@ -796,13 +801,6 @@ var Tilda = function () {
 						break;
 				}
 				_this2.level.save();
-			}
-			if (event.which == 3) {
-				event.preventDefault();
-				if (confirm('Do you want to delete this block?')) {
-					_this2.level.removeBlock(pos.x + _this2.cameraX / TILE_SIZE, pos.y + _this2.cameraY / TILE_SIZE);
-					_this2.level.save();
-				}
 			}
 		});
 	}
