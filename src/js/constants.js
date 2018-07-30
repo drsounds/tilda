@@ -1,0 +1,17 @@
+export const FLAG_SIDE_SCROLLING = 0x1;
+export const TILE_SIZE = 16;
+export const NUM_SCREEN_TILES_X = 124;
+export const NUM_SCREEN_TILES_Y = 128;
+export const TILE_SOLID = 1;
+export const TILE_FLAG_JUMP_LEFT = 2;
+export const TILE_FLAG_JUMP_TOP = 4;
+export const TILE_FLAG_JUMP_RIGHT = 8;
+export const TILE_FLAG_JUMP_BOTTOM = 16;
+export const GAME_READY = 0;
+export const GAME_RUNNING = 1;
+export const TOOL_POINTER = 0;
+export const TOOL_DRAW = 1;
+export const TOOL_PROPERTIES = 2;
+export const MODE_PLAYING = 0;
+export const MODE_EDITING = 1;
+export const TILESET = ``;

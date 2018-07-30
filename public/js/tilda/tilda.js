@@ -1,10 +1,3 @@
-import PlayerEntity from './entities/player'
-import CharacterEntity from './entities/character'
-import Block from './block'
-import Level from './level'
-import * as constants from './constants'
-import { wrapText } from './utils'
-
 export default class Tilda {
 	dispatchEvent(event) {
 		if (this.hasOwnProperty('on' + event.type) && this['on' + event.type] instanceof Function) {
@@ -79,8 +72,8 @@ export default class Tilda {
 		var x = ((event.pageX - bounds.left) / pageWidth) * cx;
 		var y = ((event.pageY - bounds.top) / pageHeight) * cy ;
 		
-		var selectedX = Math.floor((x + 1) / constants.TILE_SIZE);
-	 	var selectedY = Math.floor((y + 1) / constants.TILE_SIZE) ;
+		var selectedX = Math.floor((x + 1) / TILE_SIZE);
+	 	var selectedY = Math.floor((y + 1) / TILE_SIZE) ;
 		return {
 			x: selectedX,
 			y: selectedY
@@ -126,7 +119,7 @@ export default class Tilda {
 		this.blockTypes = {};
 		this.editor = {
 			selectedX: 0,
-			tool: constants.TOOL_POINTER,
+			tool: TOOL_POINTER,
 			selectedY: 0,
 			activeBlockType: 15
 		};
@@ -138,10 +131,10 @@ export default class Tilda {
 		this.cameraY = 0;
 		this.activeTool = 0;
 		this.isJumpingOver = false;
-		this.mode = constants.MODE_EDITING;
+		this.mode = MODE_EDITING;
 		this.tileset = this.renderer.loadImage('img/tileset.png');
-		this.loadTiles(constants.TILESET);
-		this.state = constants.GAME_READY;
+		this.loadTiles(TILESET);
+		this.state = GAME_READY;
 		this.activeBlock = null;
 		this.aKeyPressed = false;
 		this.status = {
@@ -175,23 +168,23 @@ export default class Tilda {
 		xmlHttp.open('GET', this.gameUrl + '/t.tileset', true);
 		xmlHttp.send(null);
 		this.renderer.canvas.addEventListener('mousedown', (event) => {
-			if (this.mode != constants.MODE_EDITING) {
+			if (this.mode != MODE_EDITING) {
 				return;
 			}
 			var pos = this.getPostionFromCursor();
 		
 			if (event.which == 1) {
 				switch(this.editor.tool) {
-					case constants.TOOL_DRAW:
-						this.level.setBlock(pos.x + this.cameraX / constants.TILE_SIZE, pos.y + this.cameraY / constants.TILE_SIZE, {
-							x: pos.x + this.cameraX / constants.TILE_SIZE,
-							y: pos.y + this.cameraY / constants.TILE_SIZE,
+					case TOOL_DRAW:
+						this.level.setBlock(pos.x + this.cameraX / TILE_SIZE, pos.y + this.cameraY / TILE_SIZE, {
+							x: pos.x + this.cameraX / TILE_SIZE,
+							y: pos.y + this.cameraY / TILE_SIZE,
 							type: this.editor.activeBlockType
 						});
 						break;
-					case constants.TOOL_POINTER:
+					case TOOL_POINTER:
 						if (event.shiftKey) {
-							this.level.removeBlock(pos.x + this.cameraX / constants.TILE_SIZE, pos.y + this.cameraY / constants.TILE_SIZE);
+							this.level.removeBlock(pos.x + this.cameraX / TILE_SIZE, pos.y + this.cameraY / TILE_SIZE);
 							this.level.save();
 							return
 						}
@@ -222,10 +215,10 @@ export default class Tilda {
 	
 	setBlockType(blockType) {
 		if (blockType != null) {
-			this.activeTool = constants.TOOL_DRAW;
+			this.activeTool = TOOL_DRAW;
 			this.editor.activeBlockType = event.data.blockType;
 		} else {
-			this.activeTool = constants.TOOL_POINTER;
+			this.activeTool = TOOL_POINTER;
 		}
 	} 	
 	
@@ -266,7 +259,7 @@ export default class Tilda {
 	start() {
 		this.gameInterval = setInterval(this.tick.bind(this), 5);
 		this.renderInterval = setInterval(this.render.bind(this), 5);
-		this.state = constants.GAME_RUNNING;
+		this.state = GAME_RUNNING;
 		this.ic = setInterval(() => {
 				let event = new CustomEvent('move')
 				event.data = {
@@ -282,7 +275,7 @@ export default class Tilda {
 		clearInterval(this.ic)
 		clearInterval(this.gameInterval);
 		clearInterval(this.renderInterval);
-		this.state = constants.GAME_READY;
+		this.state = GAME_READY;
 	}
 
 	loadTiles(tiles) {
@@ -357,8 +350,8 @@ export default class Tilda {
 			for (var y in this.level.blocks[x]) {
 				for (var i in this.level.objects) {
 					var collidied = false;
-					var left = x * constants.TILE_SIZE;
-					var top = y * constants.TILE_SIZE;
+					var left = x * TILE_SIZE;
+					var top = y * TILE_SIZE;
 					var block = this.level.blocks[x][y];
 					if (!block) {
 						return;
@@ -370,10 +363,10 @@ export default class Tilda {
 					if (this.isJumpingOver) {
 						return;
 					}
-					var is_solid = (blockType.flags & constants.TILE_SOLID) == constants.TILE_SOLID;
+					var is_solid = (blockType.flags & TILE_SOLID) == TILE_SOLID;
 					var obj = this.level.objects[i];
-					if (obj.x > left - constants.TILE_SIZE && obj.x < left + constants.TILE_SIZE && obj.y > top - constants.TILE_SIZE * 0.8 && obj.y < top + constants.TILE_SIZE / 2 - 1 && obj.moveX > 0 && is_solid) {
-						if ((blockType.flags & constants.TILE_FLAG_JUMP_RIGHT) == constants.TILE_FLAG_JUMP_RIGHT) {
+					if (obj.x > left - TILE_SIZE && obj.x < left + TILE_SIZE && obj.y > top - TILE_SIZE * 0.8 && obj.y < top + TILE_SIZE / 2 - 1 && obj.moveX > 0 && is_solid) {
+						if ((blockType.flags & TILE_FLAG_JUMP_RIGHT) == TILE_FLAG_JUMP_RIGHT) {
 							this.isJumpingOver = true;
 							obj.moveX = .2;
 							obj.moveZ = 1;
@@ -382,9 +375,9 @@ export default class Tilda {
 						}
 					}
 					
-					if (obj.y > top - constants.TILE_SIZE && obj.y < top + constants.TILE_SIZE / 2 - 1 && obj.x < left + constants.TILE_SIZE && obj.x > left - constants.TILE_SIZE && obj.moveX < 0 && is_solid) {
+					if (obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 1 && obj.x < left + TILE_SIZE && obj.x > left - TILE_SIZE && obj.moveX < 0 && is_solid) {
 						
-						if ((blockType.flags & constants.TILE_FLAG_JUMP_LEFT)  == constants.TILE_FLAG_JUMP_LEFT) {
+						if ((blockType.flags & TILE_FLAG_JUMP_LEFT)  == TILE_FLAG_JUMP_LEFT) {
 							this.isJumpingOver = true;
 							obj.moveX = -.2;
 							obj.moveZ = 1;
@@ -393,13 +386,13 @@ export default class Tilda {
 						}
 					}
 
-					if (obj.x > left - constants.TILE_SIZE / 2 && obj.x < left + constants.TILE_SIZE * 0.7 && obj.y > top - constants.TILE_SIZE && obj.y < top + constants.TILE_SIZE / 2 - 2 && obj.moveY > 0 && is_solid) {
+					if (obj.x > left - TILE_SIZE / 2 && obj.x < left + TILE_SIZE * 0.7 && obj.y > top - TILE_SIZE && obj.y < top + TILE_SIZE / 2 - 2 && obj.moveY > 0 && is_solid) {
 						if (block.teleport) {
 							if (block.teleport.level) {
 								this.loadLevel(block.teleport.level);
 							}
 						}
-						if ((blockType.flags & constants.TILE_FLAG_JUMP_BOTTOM)  == constants.TILE_FLAG_JUMP_BOTTOM) {
+						if ((blockType.flags & TILE_FLAG_JUMP_BOTTOM)  == TILE_FLAG_JUMP_BOTTOM) {
 							this.isJumpingOver = true;
 							obj.moveY = 1;
 							obj.moveZ = 1;
@@ -408,7 +401,7 @@ export default class Tilda {
 						}
 					}
 
-					if (obj.x > left - constants.TILE_SIZE  && obj.x < left + constants.TILE_SIZE -1 && obj.y < top + constants.TILE_SIZE / 2 && obj.y > top - constants.TILE_SIZE && is_solid) {
+					if (obj.x > left - TILE_SIZE  && obj.x < left + TILE_SIZE -1 && obj.y < top + TILE_SIZE / 2 && obj.y > top - TILE_SIZE && is_solid) {
 						if (block.script && block.script.length > 0 && this.aKeyPressed) { // #QINOTE #AQUAJOGGING@R@CT
 							if (block.script.indexOf('res://') == 0) {
 								
@@ -447,7 +440,7 @@ export default class Tilda {
 									this.loadLevel(block.teleport.level);
 								}
 							}
-							if ((blockType.flags & constants.TILE_FLAG_JUMP_TOP) == constants.TILE_FLAG_JUMP_TOP) {
+							if ((blockType.flags & TILE_FLAG_JUMP_TOP) == TILE_FLAG_JUMP_TOP) {
 								this.isJumpingOver = true;
 								obj.moveY = -0.6;
 								obj.moveZ = 1;
@@ -473,10 +466,10 @@ export default class Tilda {
 		if (this.level) {
 			for (var x in this.level.blocks) {
 				for (var y in this.level.blocks[x]) {
-					var left = ((constants.TILE_SIZE * x) - this.cameraX) * this.zoom.x;
-					var top = ((constants.TILE_SIZE * y) - this.cameraY) * this.zoom.y;
-					var width = constants.TILE_SIZE * this.zoom.x;
-					var height = constants.TILE_SIZE * this.zoom.y;
+					var left = ((TILE_SIZE * x) - this.cameraX) * this.zoom.x;
+					var top = ((TILE_SIZE * y) - this.cameraY) * this.zoom.y;
+					var width = TILE_SIZE * this.zoom.x;
+					var height = TILE_SIZE * this.zoom.y;
 					var block = this.level.blocks[x][y];
 					if (!block) {
 						return;
@@ -485,8 +478,8 @@ export default class Tilda {
 					if (!type) {
 						continue;
 					}
-					var tileX = type.tileX * constants.TILE_SIZE;
-					var tileY = type.tileY * constants.TILE_SIZE;
+					var tileX = type.tileX * TILE_SIZE;
+					var tileY = type.tileY * TILE_SIZE;
 					
 					this.renderer.renderImageChunk(this.tileset, left, top,  width, height, tileX, tileY, width, height); 
 				}
@@ -496,21 +489,21 @@ export default class Tilda {
 				var left = ((object.x) - this.cameraX) * this.zoom.x;
 				var top = ((object.y) - this.cameraY) * this.zoom.y;
 				var zeta = ((object.z)) * this.zoom.y;
-				var width = constants.TILE_SIZE * this.zoom.x;
-				var height =constants.TILE_SIZE * this.zoom.y;
-				var tileX = object.tileX * constants.TILE_SIZE;
-				var tileY = object.tileY * constants.TILE_SIZE;
+				var width = TILE_SIZE * this.zoom.x;
+				var height = TILE_SIZE * this.zoom.y;
+				var tileX = object.tileX * TILE_SIZE;
+				var tileY = object.tileY * TILE_SIZE;
 				if (zeta > 0) {
 				}
-				this.renderer.renderImageChunk(this.tileset, left, top, width, height, 0, constants.TILE_SIZE * 1, width, height); 
+				this.renderer.renderImageChunk(this.tileset, left, top, width, height, 0, TILE_SIZE * 1, width, height); 
 				this.renderer.renderImageChunk(this.tileset, left, top - zeta,  width, height, tileX, tileY, width, height);  // Render shadow
 			}
 			for (var i in this.blockTypes) {
 				var block = this.blockTypes[i];
-				var width = constants.TILE_SIZE * this.zoom.x;
-				var height = constants.TILE_SIZE * this.zoom.y;
-				var left = (i * constants.TILE_SIZE) * this.zoom.x;
-				var top = (this.renderer.canvas.height ) - constants.TILE_SIZE * 2;
+				var width = TILE_SIZE * this.zoom.x;
+				var height = TILE_SIZE * this.zoom.y;
+				var left = (i * TILE_SIZE) * this.zoom.x;
+				var top = (this.renderer.canvas.height ) - TILE_SIZE * 2;
 				//this.renderer.renderImageChunk(this.tile, left, top, width, height, block.tileX * TILE_SIZE, block.tileY * TILE_SIZE, width, height);
 			}
 		}
@@ -521,14 +514,14 @@ export default class Tilda {
 		this.cameraX = clusterX * this.gameWidth;
 		this.cameraY = clusterY * this.gameHeight;
 	
-		var width = constants.TILE_SIZE * this.zoom.x;
-		var height = constants.TILE_SIZE * this.zoom.y;
-		this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - constants.TILE_SIZE * 2, constants.TILE_SIZE, constants.TILE_SIZE, this.activeTile.x * constants.TILE_SIZE, this.activeTile.x * constants.TILE_SIZE, constants.TILE_SIZE, constants.TILE_SIZE);
+		var width = TILE_SIZE * this.zoom.x;
+		var height = TILE_SIZE * this.zoom.y;
+		this.renderer.renderImageChunk(this.tileset, 0, this.renderer.canvas.height - TILE_SIZE * 2, TILE_SIZE, TILE_SIZE, this.activeTile.x * TILE_SIZE, this.activeTile.x * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 		
 		this.renderer.context.beginPath();
 		this.renderer.context.strokeStyle = 'blue';
 		this.renderer.context.strokeWidth = '1px';
-		this.renderer.context.rect(this.editor.selectedX * constants.TILE_SIZE, this.editor.selectedY * constants.TILE_SIZE, constants.TILE_SIZE, constants.TILE_SIZE);
+		this.renderer.context.rect(this.editor.selectedX * TILE_SIZE, this.editor.selectedY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 		this.renderer.context.stroke();
 		
 		this.renderer.context.font = "11px Courier";
@@ -543,3 +536,36 @@ export default class Tilda {
 		}
 	}
 }
+
+
+// From http://stackoverflow.com/questions/2936112/text-wrap-in-a-canvas-element
+function wrapText(context, text, x, y, line_width, line_height)
+{
+    var line = '';
+    var paragraphs = text.split('\n');
+    for (var i = 0; i < paragraphs.length; i++)
+    {
+        var words = paragraphs[i].split(' ');
+        for (var n = 0; n < words.length; n++)
+        {
+            var testLine = line + words[n] + ' ';
+            var metrics = context.measureText(testLine);
+            var testWidth = metrics.width;
+            if (testWidth > line_width && n > 0)
+            {
+                context.fillText(line, x, y);
+                line = words[n] + ' ';
+                y += line_height;
+            }
+            else
+            {
+                line = testLine;
+            }
+        }
+        context.fillText(line, x, y);
+        y += line_height;
+        line = '';
+    }
+}
+
+
